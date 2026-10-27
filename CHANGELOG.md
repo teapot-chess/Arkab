@@ -15,6 +15,7 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+- [Security] **Bandit 1.14.0.** Eleven advisories against the web server's 1.13.1, mostly HTTP/2 and chunked bodies made to eat memory; 1.14.0 fixes them, and the dependency audit in CI had started to say so.
 - [Feature] **"Get help" on the status page, on the Pi image.** A button on the bridge itself (not from another computer) asks the box's own menu server to send its report, passwords and keys left out, to the support address, and shows the six-digit code that comes back with the day it stops being valid: "Help code 123 456". Each failure has its own sentence: no internet, too many requests (try again in an hour), support switched off on that server, report too large. Nothing listens and nothing comes in; the button only presses the menu server's button over loopback. Where there is no such server (a PC, a Mac) the section is not drawn.
 
 ## [Unreleased]

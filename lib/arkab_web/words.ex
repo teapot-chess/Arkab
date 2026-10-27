@@ -81,6 +81,22 @@ defmodule ArkabWeb.Words do
         "This bridge has no remote PIN, so it can only be changed from the bridge itself.",
       pin_plain:
         "The page runs on plain HTTP: the PIN crosses the hall's network in clear. It keeps a curious guest out of the buttons; it is not security against the internet.",
+      help_title: "Get help",
+      help_hint:
+        "Sends this box's report (passwords and keys left out) to the people who help, and gives a code to read out to them.",
+      help_send: "Send the report",
+      help_sending: "Sending...",
+      help_code: "Help code",
+      help_read: "Read this code to the people helping you. Valid until %{until}.",
+      help_no_internet: "The box could not reach the internet. Check its network and try again.",
+      help_rate_limited: "Too many requests from this network. Try again in an hour.",
+      help_support_off:
+        "Support is switched off on that server. Check the address in the box's menu, under Settings.",
+      help_too_large: "The report is too large to send.",
+      help_rejected: "The server did not accept the report.",
+      help_server_error: "The server gave an unexpected answer. Try again later.",
+      help_unavailable:
+        "The box's own menu did not answer. Try again, or use Get help in its menu.",
       pin_title: "Remote PIN",
       pin_is_set: "A remote PIN is set.",
       pin_is_not_set: "No remote PIN: from another computer this page is read-only.",
@@ -170,6 +186,23 @@ defmodule ArkabWeb.Words do
         "Deze brug heeft geen pincode voor op afstand, dus je kunt hem alleen vanaf de brug zelf wijzigen.",
       pin_plain:
         "De pagina draait op gewoon HTTP: de pincode gaat onversleuteld over het netwerk van de zaal. Hij houdt een nieuwsgierige gast van de knoppen af; het is geen beveiliging tegen het internet.",
+      help_title: "Hulp vragen",
+      help_hint:
+        "Stuurt het rapport van deze box (zonder wachtwoorden en sleutels) naar de mensen die helpen, en geeft een code om aan hen door te geven.",
+      help_send: "Rapport versturen",
+      help_sending: "Versturen...",
+      help_code: "Hulpcode",
+      help_read: "Geef deze code door aan de mensen die je helpen. Geldig tot %{until}.",
+      help_no_internet:
+        "De box kreeg geen verbinding met internet. Controleer het netwerk en probeer opnieuw.",
+      help_rate_limited: "Te veel aanvragen vanaf dit netwerk. Probeer het over een uur opnieuw.",
+      help_support_off:
+        "Hulp staat uit op die server. Controleer het adres in het menu van de box, onder Instellingen.",
+      help_too_large: "Het rapport is te groot om te versturen.",
+      help_rejected: "De server heeft het rapport niet aanvaard.",
+      help_server_error: "De server gaf een onverwacht antwoord. Probeer het later opnieuw.",
+      help_unavailable:
+        "Het eigen menu van de box antwoordde niet. Probeer opnieuw, of gebruik Hulp vragen in het menu.",
       pin_title: "Pincode voor op afstand",
       pin_is_set: "Er is een pincode voor op afstand ingesteld.",
       pin_is_not_set: "Geen pincode: vanaf een andere computer is deze pagina alleen-lezen.",

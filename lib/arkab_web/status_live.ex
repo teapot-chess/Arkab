@@ -17,13 +17,13 @@ defmodule ArkabWeb.StatusLive do
 
   import ArkabWeb.Components, only: [foot: 1, logo: 1]
 
-  alias Arkab.{Autostart, Updates}
+  alias Arkab.{Autostart, Help, Updates}
   alias ArkabWeb.{Local, Pin, Words}
 
   # Everything that changes something. The rest of the events are none.
   @changing ~w(join update later update_check check_now autostart remove)
   # The PIN's own: this machine only, a grant is not enough.
-  @local_only ~w(pin_set pin_remove)
+  @local_only ~w(pin_set pin_remove help)
 
   @impl true
   def mount(_params, session, socket) do
@@ -41,7 +41,9 @@ defmodule ArkabWeb.StatusLive do
        checking?: false,
        local?: Local.local_socket?(socket),
        grant: session[Pin.session_key()],
-       pin_message: nil
+       pin_message: nil,
+       helping?: false,
+       help: nil
      )
      |> assign_access()
      |> load()}
@@ -107,6 +109,16 @@ defmodule ArkabWeb.StatusLive do
     {:noreply, load(socket)}
   end
 
+  # Sends the report through the box's setup server. This machine only: a report leaves the box.
+  defp change("help", _params, socket) do
+    if socket.assigns.helping? or not Help.available?() do
+      {:noreply, socket}
+    else
+      {:noreply,
+       socket |> assign(helping?: true, help: nil) |> start_async(:help, fn -> Help.request() end)}
+    end
+  end
+
   defp change("pin_set", %{"pin" => pin}, socket) do
     message =
       case Pin.set(pin) do
@@ -133,6 +145,15 @@ defmodule ArkabWeb.StatusLive do
 
     {:noreply, socket |> assign(checking?: false, update_message: message) |> load()}
   end
+
+  def handle_async(:help, {:ok, {:ok, sent}}, socket),
+    do: {:noreply, assign(socket, helping?: false, help: {:ok, sent})}
+
+  def handle_async(:help, {:ok, {:error, reason}}, socket),
+    do: {:noreply, assign(socket, helping?: false, help: {:error, reason})}
+
+  def handle_async(:help, {:exit, _reason}, socket),
+    do: {:noreply, assign(socket, helping?: false, help: {:error, :unavailable})}
 
   def handle_async(:check, {:exit, _reason}, socket),
     do: {:noreply, assign(socket, checking?: false, update_message: {:error, :check_failed})}
@@ -203,6 +224,15 @@ defmodule ArkabWeb.StatusLive do
       pin_set?: pin_set?,
       unlocked?: not socket.assigns.local? and Pin.valid_grant?(socket.assigns.grant)
     )
+  end
+
+  defp help_error_key(reason), do: String.to_existing_atom("help_" <> Atom.to_string(reason))
+
+  defp help_until(iso) do
+    case DateTime.from_iso8601(iso) do
+      {:ok, at, _offset} -> Calendar.strftime(at, "%Y-%m-%d %H:%M UTC")
+      _ -> iso
+    end
   end
 
   defp megabytes(bytes), do: :erlang.float_to_binary(bytes / 1_048_576, decimals: 1)
@@ -426,6 +456,32 @@ defmodule ArkabWeb.StatusLive do
             {Words.t(@locale, elem(@update_message, 1))}
           </span>
         </p>
+
+        <div :if={@local? and Help.available?()} id="help">
+          <h3>{Words.t(@locale, :help_title)}</h3>
+
+          <p class="note">{Words.t(@locale, :help_hint)}</p>
+
+          <p>
+            <button id="help-send" type="button" phx-click="help" disabled={@helping?}>
+              {if @helping?, do: Words.t(@locale, :help_sending), else: Words.t(@locale, :help_send)}
+            </button>
+          </p>
+
+          <div :if={match?({:ok, _}, @help)} id="help-result">
+            <p class="note">{Words.t(@locale, :help_code)}</p>
+
+            <p id="help-code" style="font-size: 2.6em; font-weight: 700; letter-spacing: 0.08em;">
+              {Help.format_code(elem(@help, 1).code)}
+            </p>
+
+            <p>{Words.t(@locale, :help_read, until: help_until(elem(@help, 1).expires_at))}</p>
+          </div>
+
+          <p :if={match?({:error, _}, @help)} id="help-error" class="error">
+            {Words.t(@locale, help_error_key(elem(@help, 1)))}
+          </p>
+        </div>
 
         <div :if={@local?} id="pin">
           <h3>{Words.t(@locale, :pin_title)}</h3>

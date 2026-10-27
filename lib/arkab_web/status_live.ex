@@ -17,13 +17,13 @@ defmodule ArkabWeb.StatusLive do
 
   import ArkabWeb.Components, only: [foot: 1, logo: 1]
 
-  alias Arkab.{Autostart, Help, Updates}
+  alias Arkab.{Autostart, Box, Help, Updates}
   alias ArkabWeb.{Local, Pin, Words}
 
   # Everything that changes something. The rest of the events are none.
   @changing ~w(join update later update_check check_now autostart remove)
   # The PIN's own: this machine only, a grant is not enough.
-  @local_only ~w(pin_set pin_remove help)
+  @local_only ~w(pin_set pin_remove help upgrade_open upgrade_cancel upgrade switch_open switch_cancel switch)
 
   @impl true
   def mount(_params, session, socket) do
@@ -43,14 +43,27 @@ defmodule ArkabWeb.StatusLive do
        grant: session[Pin.session_key()],
        pin_message: nil,
        helping?: false,
-       help: nil
+       help: nil,
+       box: nil,
+       box_polling?: false,
+       box_tick: 0,
+       upgrade_confirm?: false,
+       upgrade_message: nil,
+       switch_confirm?: false,
+       switch_message: nil
      )
      |> assign_access()
-     |> load()}
+     |> load()
+     |> first_poll()}
   end
 
+  # The first answer of the box's setup server comes with the page, not a tick later.
+  defp first_poll(socket), do: if(connected?(socket), do: poll_box(socket, true), else: socket)
+
   @impl true
-  def handle_info(:refresh, socket), do: {:noreply, socket |> assign_access() |> load()}
+  def handle_info(:refresh, socket),
+    do: {:noreply, socket |> assign_access() |> load() |> poll_box()}
+
   def handle_info(:update_changed, socket), do: {:noreply, load(socket)}
   def handle_info(_other, socket), do: {:noreply, socket}
 
@@ -119,6 +132,43 @@ defmodule ArkabWeb.StatusLive do
     end
   end
 
+  defp change("upgrade_open", _params, socket),
+    do: {:noreply, assign(socket, upgrade_confirm?: offer(socket) != nil, upgrade_message: nil)}
+
+  defp change("upgrade_cancel", _params, socket),
+    do: {:noreply, assign(socket, upgrade_confirm?: false)}
+
+  # The train comes from what the box offered, never from the browser.
+  defp change("upgrade", _params, socket) do
+    case offer(socket) do
+      nil ->
+        {:noreply, assign(socket, upgrade_confirm?: false)}
+
+      %{train: train} ->
+        {:noreply,
+         socket
+         |> assign(upgrade_confirm?: false, upgrade_message: nil)
+         |> start_async(:upgrade, fn -> Box.upgrade(train) end)}
+    end
+  end
+
+  defp change("switch_open", _params, socket),
+    do: {:noreply, assign(socket, switch_confirm?: slave?(socket), switch_message: nil)}
+
+  defp change("switch_cancel", _params, socket),
+    do: {:noreply, assign(socket, switch_confirm?: false)}
+
+  defp change("switch", _params, socket) do
+    if slave?(socket) do
+      {:noreply,
+       socket
+       |> assign(switch_confirm?: false, switch_message: nil)
+       |> start_async(:switch, fn -> Box.switch_mode("master") end)}
+    else
+      {:noreply, assign(socket, switch_confirm?: false)}
+    end
+  end
+
   defp change("pin_set", %{"pin" => pin}, socket) do
     message =
       case Pin.set(pin) do
@@ -154,6 +204,29 @@ defmodule ArkabWeb.StatusLive do
 
   def handle_async(:help, {:exit, _reason}, socket),
     do: {:noreply, assign(socket, helping?: false, help: {:error, :unavailable})}
+
+  def handle_async(:upgrade, {:ok, :ok}, socket),
+    do: {:noreply, socket |> assign(upgrade_message: {:ok, :upgrade_started}) |> poll_box(true)}
+
+  def handle_async(:upgrade, {:ok, {:error, reason}}, socket),
+    do: {:noreply, assign(socket, upgrade_message: {:error, upgrade_error_key(reason)})}
+
+  def handle_async(:upgrade, {:exit, _reason}, socket),
+    do: {:noreply, assign(socket, upgrade_message: {:error, :upgrade_unavailable})}
+
+  def handle_async(:switch, {:ok, :ok}, socket),
+    do: {:noreply, assign(socket, switch_message: {:ok, :switch_started})}
+
+  def handle_async(:switch, {:ok, {:error, _reason}}, socket),
+    do: {:noreply, assign(socket, switch_message: {:error, :switch_failed})}
+
+  def handle_async(:switch, {:exit, _reason}, socket),
+    do: {:noreply, assign(socket, switch_message: {:error, :switch_failed})}
+
+  def handle_async(:box, {:ok, {:ok, box}}, socket),
+    do: {:noreply, assign(socket, box: box, box_polling?: false)}
+
+  def handle_async(:box, _other, socket), do: {:noreply, assign(socket, box_polling?: false)}
 
   def handle_async(:check, {:exit, _reason}, socket),
     do: {:noreply, assign(socket, checking?: false, update_message: {:error, :check_failed})}
@@ -225,6 +298,51 @@ defmodule ArkabWeb.StatusLive do
       unlocked?: not socket.assigns.local? and Pin.valid_grant?(socket.assigns.grant)
     )
   end
+
+  # Asks the box's setup server how the image and the mode stand: every 5 seconds, every second while
+  # an upgrade runs (the progress bar). Not at all where there is no such server, nor for a visitor who
+  # may not use the answer. Asked off the page's process: the server may be slow.
+  defp poll_box(socket, force? \\ false) do
+    tick = socket.assigns.box_tick + 1
+    socket = assign(socket, box_tick: tick)
+
+    cond do
+      not socket.assigns.local? or not Box.available?() ->
+        socket
+
+      socket.assigns.box_polling? ->
+        socket
+
+      force? or upgrading?(socket) or rem(tick, 5) == 1 ->
+        socket |> assign(box_polling?: true) |> start_async(:box, &Box.snapshot/0)
+
+      true ->
+        socket
+    end
+  end
+
+  defp upgrading?(%{assigns: %{box: %{system: %{busy?: busy?}}}}), do: busy?
+  defp upgrading?(_socket), do: false
+
+  defp offer(%{assigns: %{box: %{system: %{offer: offer}}}}), do: offer
+  defp offer(_socket), do: nil
+
+  defp slave?(%{assigns: %{box: %{mode: "slave"}}}), do: true
+  defp slave?(_socket), do: false
+
+  defp upgrade_error_key(:busy), do: :upgrade_busy
+  defp upgrade_error_key(:updates_off), do: :upgrade_updates_off
+  defp upgrade_error_key(:not_ab), do: :upgrade_not_ab
+  defp upgrade_error_key(:bad_train), do: :upgrade_bad_train
+  defp upgrade_error_key(:unavailable), do: :upgrade_unavailable
+  defp upgrade_error_key(_other), do: :upgrade_server_error
+
+  defp phase_key("downloading"), do: :phase_downloading
+  defp phase_key("verifying"), do: :phase_verifying
+  defp phase_key("installing"), do: :phase_installing
+  defp phase_key("restarting"), do: :phase_restarting
+  defp phase_key("waiting"), do: :phase_waiting
+  defp phase_key(_other), do: :phase_working
 
   defp help_error_key(reason), do: String.to_existing_atom("help_" <> Atom.to_string(reason))
 
@@ -481,6 +599,111 @@ defmodule ArkabWeb.StatusLive do
           <p :if={match?({:error, _}, @help)} id="help-error" class="error">
             {Words.t(@locale, help_error_key(elem(@help, 1)))}
           </p>
+        </div>
+
+        <div :if={@local? and Box.available?() and @box} id="box">
+          <h3>{Words.t(@locale, :box_title)}</h3>
+
+          <p class="note" id="box-version">
+            {Words.t(@locale, :box_image,
+              train: @box.system.train,
+              version: @box.system.version
+            )}
+          </p>
+
+          <section :if={@box.system.offer && !@box.system.busy?} id="upgrade-card">
+            <h4>{Words.t(@locale, :upgrade_available, train: @box.system.offer.train)}</h4>
+
+            <p :if={@box.system.offer.notes != ""} class="note" id="upgrade-notes">
+              {@box.system.offer.notes}
+            </p>
+
+            <p class="note">{Words.t(@locale, :upgrade_explain)}</p>
+
+            <p :if={!@box.system.updates_on?} id="upgrade-off" class="error">
+              {Words.t(@locale, :upgrade_updates_off)}
+            </p>
+
+            <p :if={!@upgrade_confirm?}>
+              <button
+                id="upgrade-open"
+                type="button"
+                phx-click="upgrade_open"
+                disabled={!@box.system.updates_on?}
+              >
+                {Words.t(@locale, :upgrade_button, train: @box.system.offer.train)}
+              </button>
+            </p>
+
+            <div :if={@upgrade_confirm?} id="upgrade-confirm">
+              <p>{Words.t(@locale, :upgrade_confirm, train: @box.system.offer.train)}</p>
+
+              <p>
+                <button id="upgrade-yes" type="button" phx-click="upgrade">
+                  {Words.t(@locale, :upgrade_yes, train: @box.system.offer.train)}
+                </button>
+
+                <button id="upgrade-no" type="button" phx-click="upgrade_cancel">
+                  {Words.t(@locale, :cancel)}
+                </button>
+              </p>
+            </div>
+          </section>
+
+          <p
+            :if={!@box.system.offer && @box.system.offer_blocked}
+            id="upgrade-blocked"
+            class="note"
+          >
+            {Words.t(@locale, :upgrade_blocked, version: @box.system.offer_blocked)}
+          </p>
+
+          <div :if={@box.system.busy?} id="upgrade-progress">
+            <p>
+              {Words.t(@locale, phase_key(@box.system.phase))}
+              <span :if={@box.system.progress} id="upgrade-percent">{@box.system.progress}%</span>
+            </p>
+            <progress :if={@box.system.progress} max="100" value={@box.system.progress}></progress>
+            <p class="note">{Words.t(@locale, :upgrade_keep_power)}</p>
+          </div>
+
+          <p :if={@box.system.request_error == "round_in_progress"} id="upgrade-round" class="error">
+            {Words.t(@locale, :upgrade_round)}
+          </p>
+
+          <p :if={@upgrade_message} id="upgrade-message" class={elem(@upgrade_message, 0)}>
+            {Words.t(@locale, elem(@upgrade_message, 1))}
+          </p>
+
+          <div :if={@box.mode == "slave"} id="mode-card">
+            <h4>{Words.t(@locale, :mode_slave)}</h4>
+
+            <p class="note">{Words.t(@locale, :mode_slave_hint)}</p>
+
+            <p :if={!@switch_confirm?}>
+              <button id="switch-open" type="button" phx-click="switch_open">
+                {Words.t(@locale, :switch_button)}
+              </button>
+            </p>
+
+            <div :if={@switch_confirm?} id="switch-confirm">
+              <p>{Words.t(@locale, :switch_confirm)}</p>
+
+              <p>
+                <button id="switch-yes" type="button" phx-click="switch">
+                  {Words.t(@locale, :switch_yes)}
+                </button>
+
+                <button id="switch-no" type="button" phx-click="switch_cancel">
+                  {Words.t(@locale, :cancel)}
+                </button>
+              </p>
+            </div>
+
+            <p :if={@switch_message} id="switch-message" class={elem(@switch_message, 0)}>
+              {Words.t(@locale, elem(@switch_message, 1))}
+            </p>
+          </div>
         </div>
 
         <div :if={@local?} id="pin">

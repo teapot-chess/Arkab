@@ -97,6 +97,43 @@ defmodule ArkabWeb.Words do
       help_server_error: "The server gave an unexpected answer. Try again later.",
       help_unavailable:
         "The box's own menu did not answer. Try again, or use Get help in its menu.",
+      box_title: "This box",
+      box_image: "System image %{train} (version %{version})",
+      upgrade_available: "%{train} is available",
+      upgrade_explain:
+        "A new system image for this box. Your data and settings stay. The box restarts when it is done, and goes back to the old version by itself if the new one does not start.",
+      upgrade_button: "Upgrade to %{train}",
+      upgrade_confirm:
+        "Upgrade this box to %{train}? It downloads and installs the new system, then restarts. Do not switch it off meanwhile, and do not do this during a round.",
+      upgrade_yes: "Yes, upgrade to %{train}",
+      cancel: "Cancel",
+      upgrade_blocked:
+        "A newer train exists, but this box needs version %{version} of its own train first.",
+      upgrade_started: "The upgrade has started.",
+      upgrade_keep_power: "Keep the power on.",
+      upgrade_round:
+        "A round is in progress, so the upgrade did not start. Try again between rounds.",
+      upgrade_busy: "The box is busy with another update.",
+      upgrade_updates_off: "System updates are off on this box.",
+      upgrade_not_ab: "This card cannot take system updates.",
+      upgrade_bad_train: "That is not a later train than this box runs.",
+      upgrade_unavailable: "The box's own menu did not answer. Try again in a moment.",
+      upgrade_server_error: "The box gave an unexpected answer. Try again later.",
+      phase_downloading: "Downloading the update",
+      phase_verifying: "Checking the download",
+      phase_installing: "Installing the update",
+      phase_restarting: "Restarting. This page comes back when the box does.",
+      phase_waiting: "Waiting for a quiet moment (no round in progress)",
+      phase_working: "Working on the update",
+      mode_slave: "This box is a slave",
+      mode_slave_hint:
+        "It only reads the DGT boards and passes them to a master. To make it the master of the hall instead (Alnasl and the hall screen), switch it here.",
+      switch_button: "Switch to master",
+      switch_confirm:
+        "Switch this box to master? Arkab stops here, Alnasl and the hall screen start, and the box restarts. What Arkab keeps stays on the card.",
+      switch_yes: "Yes, switch to master",
+      switch_started: "Switching. The box restarts.",
+      switch_failed: "The box did not switch. Try again, or use Settings in its menu.",
       pin_title: "Remote PIN",
       pin_is_set: "A remote PIN is set.",
       pin_is_not_set: "No remote PIN: from another computer this page is read-only.",
@@ -203,6 +240,44 @@ defmodule ArkabWeb.Words do
       help_server_error: "De server gaf een onverwacht antwoord. Probeer het later opnieuw.",
       help_unavailable:
         "Het eigen menu van de box antwoordde niet. Probeer opnieuw, of gebruik Hulp vragen in het menu.",
+      box_title: "Deze box",
+      box_image: "Systeemimage %{train} (versie %{version})",
+      upgrade_available: "%{train} is beschikbaar",
+      upgrade_explain:
+        "Een nieuw systeemimage voor deze box. Je gegevens en instellingen blijven. De box start opnieuw op als hij klaar is, en keert zelf terug naar de oude versie als de nieuwe niet start.",
+      upgrade_button: "Upgraden naar %{train}",
+      upgrade_confirm:
+        "Deze box upgraden naar %{train}? Hij downloadt en installeert het nieuwe systeem en start dan opnieuw op. Zet hem ondertussen niet uit, en doe dit niet tijdens een ronde.",
+      upgrade_yes: "Ja, upgraden naar %{train}",
+      cancel: "Annuleren",
+      upgrade_blocked:
+        "Er bestaat een nieuwere reeks, maar deze box heeft eerst versie %{version} van zijn eigen reeks nodig.",
+      upgrade_started: "De upgrade is begonnen.",
+      upgrade_keep_power: "Laat de stroom aan.",
+      upgrade_round:
+        "Er loopt een ronde, dus de upgrade is niet gestart. Probeer het opnieuw tussen twee rondes.",
+      upgrade_busy: "De box is bezig met een andere update.",
+      upgrade_updates_off: "Systeemupdates staan uit op deze box.",
+      upgrade_not_ab: "Deze kaart kan geen systeemupdates krijgen.",
+      upgrade_bad_train: "Dat is geen latere reeks dan die deze box draait.",
+      upgrade_unavailable: "Het eigen menu van de box antwoordde niet. Probeer zo opnieuw.",
+      upgrade_server_error: "De box gaf een onverwacht antwoord. Probeer het later opnieuw.",
+      phase_downloading: "De update wordt gedownload",
+      phase_verifying: "De download wordt gecontroleerd",
+      phase_installing: "De update wordt geïnstalleerd",
+      phase_restarting: "Opnieuw opstarten. Deze pagina komt terug als de box er weer is.",
+      phase_waiting: "Wachten op een rustig moment (geen ronde bezig)",
+      phase_working: "Bezig met de update",
+      mode_slave: "Deze box is een slave",
+      mode_slave_hint:
+        "Hij leest alleen de DGT-borden en geeft ze door aan een master. Wil je hem zelf de master van de zaal maken (Alnasl en het zaalscherm), schakel hem dan hier om.",
+      switch_button: "Omschakelen naar master",
+      switch_confirm:
+        "Deze box omschakelen naar master? Arkab stopt hier, Alnasl en het zaalscherm starten, en de box start opnieuw op. Wat Arkab bewaart blijft op de kaart.",
+      switch_yes: "Ja, omschakelen naar master",
+      switch_started: "Omschakelen. De box start opnieuw op.",
+      switch_failed:
+        "De box schakelde niet om. Probeer opnieuw, of gebruik Instellingen in zijn menu.",
       pin_title: "Pincode voor op afstand",
       pin_is_set: "Er is een pincode voor op afstand ingesteld.",
       pin_is_not_set: "Geen pincode: vanaf een andere computer is deze pagina alleen-lezen.",

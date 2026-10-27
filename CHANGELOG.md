@@ -15,6 +15,10 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+- [Feature] **"Get help" on the status page, on the Pi image.** A button on the bridge itself (not from another computer) asks the box's own menu server to send its report, passwords and keys left out, to the support address, and shows the six-digit code that comes back with the day it stops being valid: "Help code 123 456". Each failure has its own sentence: no internet, too many requests (try again in an hour), support switched off on that server, report too large. Nothing listens and nothing comes in; the button only presses the menu server's button over loopback. Where there is no such server (a PC, a Mac) the section is not drawn.
+
+## [Unreleased]
+
 ## [0.4.0] - 2026-10-24
 
 - [Feature] **A remote PIN lets a phone or laptop in the hall do what the bridge's own screen can.** Until now, anyone who was not sitting at the bridge got the "Read-only view", and the only way out was an SSH port forward, which an organiser holding an iPhone does not have in the pocket. Under "This program" the bridge itself can now set a PIN (4 characters at least, stored as a salted PBKDF2 hash and compared in constant time). With one set, the read-only banner elsewhere offers "Enter PIN", and the right one gives that browser every button for 12 hours through the encrypted session cookie. `tailscale serve` and reverse proxies can unlock too and still count as remote. The PIN can be set, changed and removed from the bridge itself only; changing or removing it locks every unlocked browser again, even a page that is already open; five wrong tries lock an address out for five minutes. The page is plain HTTP, so the PIN crosses the hall's network in clear. It is a lock for the hall, not security against the internet. No PIN, no change: the page stays read-only from elsewhere.

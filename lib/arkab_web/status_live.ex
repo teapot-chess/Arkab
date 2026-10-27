@@ -378,7 +378,7 @@ defmodule ArkabWeb.StatusLive do
             {Words.t(@locale, :scan)}
           </button>
         </form>
-         <video id="scan-video" phx-update="ignore" hidden playsinline></video>
+        <video id="scan-video" phx-update="ignore" hidden playsinline></video>
         <p :if={@message} id="join-message" class={elem(@message, 0)}>{elem(@message, 1)}</p>
 
         <p class="note">{Words.t(@locale, :join_hint)}</p>
@@ -515,7 +515,7 @@ defmodule ArkabWeb.StatusLive do
           <p class="note">{Words.t(@locale, :pin_plain)}</p>
         </div>
       </section>
-       <.foot locale={@locale} page={:status} />
+      <.foot locale={@locale} page={:status} />
     </main>
     """
   end

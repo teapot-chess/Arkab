@@ -77,6 +77,11 @@ defmodule Arkab.Dgt.Protocol do
   @send_battery_status 0x4C
   # Asks for the firmware version (DGT_MSG_VERSION).
   @send_version 0x4D
+  # Asks for the board's memory of events (DGT_MSG_EE_MOVES): what the bus
+  # calls "from start" (`Arkab.Dgt.Bus`). PUBLISHED, never sent to a real
+  # board on its own line: the bus version of the question was answered by
+  # both boards of 2026-10-12, this one was not asked.
+  @send_ee_moves 0x49
 
   @commands %{
     reset: @send_reset,
@@ -89,7 +94,8 @@ defmodule Arkab.Dgt.Protocol do
     trademark: @send_trademark,
     update_nice: @send_update_nice,
     battery: @send_battery_status,
-    version: @send_version
+    version: @send_version,
+    ee_moves: @send_ee_moves
   }
 
   # --- message ids (without bit 7): PUBLISHED ----------------------------------
@@ -157,7 +163,7 @@ defmodule Arkab.Dgt.Protocol do
 
   # --- writing commands --------------------------------------------------------
 
-  @doc "The byte of a command: `:reset | :clock | :board | :update | :update_board | :update_nice | :serial | :bus_address | :trademark | :battery | :version`."
+  @doc "The byte of a command: `:reset | :clock | :board | :update | :update_board | :update_nice | :serial | :bus_address | :trademark | :battery | :version | :ee_moves`."
   def command(name), do: <<Map.fetch!(@commands, name)>>
 
   def commands, do: @commands
@@ -175,6 +181,7 @@ defmodule Arkab.Dgt.Protocol do
           | {:trademark, String.t()}
           | {:battery, binary()}
           | {:ee_moves, binary()}
+          | {:ee_moves_cut, non_neg_integer()}
           | {:unknown, byte(), binary()}
 
   @doc """
@@ -194,6 +201,15 @@ defmodule Arkab.Dgt.Protocol do
         <<_skip, rest::binary>> = buffer
         parse(rest, acc)
 
+      # The board's memory is the one long message, and every byte of it has
+      # bit 7 clear (the memory format, `Arkab.Dgt.Bus.changes/1`). A byte
+      # with bit 7 set inside it is the next message: this one was cut short
+      # on the line, and waiting for the rest of it would swallow the
+      # messages after it as its "data". What arrived is let go.
+      (cut = cut_short(id, buffer, size)) != nil ->
+        <<_cut::binary-size(^cut), rest::binary>> = buffer
+        parse(rest, [{:ee_moves_cut, cut - 3} | acc])
+
       byte_size(buffer) >= size ->
         length = size - 3
         <<_header::binary-size(3), data::binary-size(^length), rest::binary>> = buffer
@@ -210,6 +226,21 @@ defmodule Arkab.Dgt.Protocol do
 
   defp parse(<<_garbage, rest::binary>>, acc), do: parse(rest, acc)
   defp parse(<<>>, acc), do: {Enum.reverse(acc), <<>>}
+
+  @starts for byte <- 0x80..0xFF, do: <<byte>>
+
+  defp cut_short(id, _buffer, _size) when (id &&& 0x7F) != @msg_ee_moves, do: nil
+
+  defp cut_short(_id, buffer, size) do
+    within = min(size, byte_size(buffer))
+
+    if within > 3 do
+      case :binary.match(buffer, @starts, scope: {3, within - 3}) do
+        {index, 1} -> index
+        :nomatch -> nil
+      end
+    end
+  end
 
   # A square holds 0x00-0x0F and nothing else. A "dump" with any other byte
   # in it is not a board speaking: it is two of them at once (a loop read
@@ -395,6 +426,8 @@ defmodule Arkab.Dgt.Protocol do
   end
 
   def encode({:field, square, piece}), do: frame(@msg_field_update, <<square, code(piece)>>)
+
+  def encode({:ee_moves, data}), do: frame(@msg_ee_moves, data)
 
   def encode({:serial, text}),
     do: frame(@msg_serialnr, String.pad_trailing(String.slice(text, 0, 5), 5))

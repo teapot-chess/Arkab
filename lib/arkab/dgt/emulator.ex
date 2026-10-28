@@ -45,7 +45,10 @@ defmodule Arkab.Dgt.Emulator do
             sit_out?: false,
             # What "what changed?" will answer, and what it answered last.
             journal: <<>>,
-            sent: <<>>
+            sent: <<>>,
+            # What "from start" reads back: everything it wrote down, from
+            # being switched on (no 0x85 is ever sent, so no later mark).
+            memory: <<>>
 
   @doc """
   A board. Its address is its serial number as a number unless `:address`
@@ -62,7 +65,8 @@ defmodule Arkab.Dgt.Emulator do
           _other -> 1
         end
 
-    %{emu | address: address, journal: <<0x6A>> <> scan(Board.empty(), emu.board)}
+    switched_on = <<0x6A>> <> scan(Board.empty(), emu.board)
+    %{emu | address: address, journal: switched_on, memory: switched_on}
   end
 
   @doc "Several boards on one loop, at the given addresses."
@@ -147,6 +151,7 @@ defmodule Arkab.Dgt.Emulator do
         byte == commands.version -> {Protocol.encode({:version, emu.version}), emu}
         byte == commands.bus_address -> {Protocol.encode({:bus_address, emu.address}), emu}
         byte == commands.trademark -> {Protocol.encode({:trademark, "Arkab emulator"}), emu}
+        byte == commands.ee_moves -> {Protocol.encode({:ee_moves, memory(emu)}), emu}
         true -> {<<>>, emu}
       end
 
@@ -197,9 +202,12 @@ defmodule Arkab.Dgt.Emulator do
     do: {Bus.answer(:changes, emu.address, emu.sent), emu}
 
   defp bus_answer(emu, :from_start, _all?),
-    do: {Bus.answer(:from_start, emu.address, <<0x7B>> <> scan(Board.empty(), emu.board)), emu}
+    do: {Bus.answer(:from_start, emu.address, memory(emu)), emu}
 
   defp bus_answer(emu, :end_busmode, _all?), do: {<<>>, %{emu | bus?: false, deaf?: old?(emu)}}
+
+  # As both real boards began theirs: the start-of-game mark, then the rest.
+  defp memory(emu), do: <<0x7B>> <> emu.memory
 
   defp clock_bytes(%{clock: nil}), do: <<>>
 
@@ -246,7 +254,8 @@ defmodule Arkab.Dgt.Emulator do
         <<>>
       end
 
-    {bytes, %{emu | board: board, journal: emu.journal <> scan(emu.board, board)}}
+    written = scan(emu.board, board)
+    {bytes, %{emu | board: board, journal: emu.journal <> written, memory: emu.memory <> written}}
   end
 
   @doc """
@@ -257,17 +266,27 @@ defmodule Arkab.Dgt.Emulator do
   def set_clock(%__MODULE__{} = emu, reading) do
     pressed? = emu.clock != nil and emu.clock.running != reading.running
 
-    journal =
-      if pressed? do
-        emu.journal <>
-          Bus.clock_event(:white, reading.white_ms) <> Bus.clock_event(:black, reading.black_ms)
-      else
-        emu.journal
-      end
+    written =
+      if pressed?,
+        do:
+          Bus.clock_event(:white, reading.white_ms) <> Bus.clock_event(:black, reading.black_ms),
+        else: <<>>
 
-    emu = %{emu | clock: reading, journal: journal}
+    emu = %{emu | clock: reading, journal: emu.journal <> written, memory: emu.memory <> written}
     {if(emu.mode == :update and not emu.bus?, do: clock_bytes(emu), else: <<>>), emu}
   end
+
+  @doc """
+  The board is switched off and on again: it writes 0x6A and every piece it
+  finds, as the real ones do, and forgets what it was asked last.
+  """
+  def power_up(%__MODULE__{} = emu) do
+    written = <<0x6A>> <> scan(Board.empty(), emu.board)
+    %{emu | journal: emu.journal <> written, memory: emu.memory <> written, sent: <<>>}
+  end
+
+  @doc "Writes `bytes` into the board's memory as they are: wrapped, garbled, made up."
+  def write_memory(%__MODULE__{} = emu, bytes), do: %{emu | memory: emu.memory <> bytes}
 
   @doc "The same for one board of a loop."
   def set_board(emulators, address, board) when is_list(emulators),

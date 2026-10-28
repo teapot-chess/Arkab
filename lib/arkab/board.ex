@@ -66,6 +66,22 @@ defmodule Arkab.Board do
 
   def from_text(_other), do: :error
 
+  @doc "One square as `to_text/1` writes it: a FEN letter, or `.` for nothing."
+  def letter(nil), do: "."
+  def letter(piece), do: <<Map.fetch!(@letters, piece)>>
+
+  @doc "What `letter/1` writes, read back: `{:ok, piece | nil}` or `:error`."
+  def from_letter("."), do: {:ok, nil}
+
+  def from_letter(<<c>>) do
+    case Map.fetch(@pieces, c) do
+      {:ok, piece} -> {:ok, piece}
+      :error -> :error
+    end
+  end
+
+  def from_letter(_other), do: :error
+
   @doc "The board as seen from the other side: a board plugged in turned round."
   def rotate(board), do: board |> Tuple.to_list() |> Enum.reverse() |> List.to_tuple()
 

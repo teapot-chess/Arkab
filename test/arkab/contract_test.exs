@@ -111,7 +111,21 @@ defmodule Arkab.ContractTest do
         {:info, %{serial: "06310", firmware: "1.9", trademark: "DGT", battery: "0A1B"}},
         {:info, %{bus_address: 6310, loop_number: 6310, error: ":enoent"}},
         {:info, %{clock: false}},
-        {:info, %{clock_battery_low: true}}
+        {:info, %{clock_battery_low: true}},
+        {:history,
+         [
+           :start_mark,
+           :start_position,
+           {:clock, :white, 5_430_000},
+           {:field, 52, nil},
+           {:field, 36, {:w, :p}},
+           :power_up,
+           :restarted,
+           :empty_board,
+           :start_position_rotated,
+           :end_of_data
+         ]},
+        {:history, []}
       ]
 
       encoded =

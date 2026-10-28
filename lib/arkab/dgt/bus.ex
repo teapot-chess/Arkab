@@ -85,6 +85,30 @@ defmodule Arkab.Dgt.Bus do
   - 0x85 (set a start-of-game mark) and 0x89 (reset) were never sent, on
     purpose: the one writes to the board's memory, the other is not needed.
     0x8D ("send all") was answered by neither board.
+
+  ## The board's memory, read back
+
+  "From start" (0x86) is asked of every board when it is met, comes back,
+  or says it was switched on (`Arkab.Driver.DgtBus`): what it wrote down is
+  how a game played while nobody was reading the board is recovered
+  (`history/1`, and Alnasl's merge of it). Both boards of 2026-10-12
+  answered it, with 1467 and 1319 bytes. NOT seen:
+
+  - how much a board holds. DGT speaks of some 500 moves; neither memory
+    was full;
+  - what a full memory does: begins again at the front (and in which order
+    it is then read back), or stops writing. The reader does not depend on
+    it: an event cut in half at the front of a memory is a few bytes that
+    decode as nothing, or as one field event before anything is known of
+    the board, which the merge ignores;
+  - whether "from start" ever answers from anywhere but the last 0x7B. No
+    0x85 has ever been sent, so the last 0x7B is whatever the board wrote
+    itself.
+
+  0x85, the start-of-game mark that would make "from start" mean "this
+  game", is deliberately NOT in `commands/0`: it writes to the board's
+  memory, and that is tried on one real board before any box does it to a
+  hall's worth.
   """
 
   import Bitwise
@@ -163,13 +187,20 @@ defmodule Arkab.Dgt.Bus do
   #              clock answer are 01 32 12.)
   #   0x6A       the board was switched on
   #   0x6B-0x6F, 0x7A-0x7F  one-byte marks (0x6F a starting position, 0x7B
-  #              a start-of-game mark, 0x7C the board restarted itself)
+  #              a start-of-game mark, 0x7C the board restarted itself).
+  #              PUBLISHED, not seen to mean it: 0x6B end of the data, 0x6D
+  #              the board stood empty, 0x7A a starting position the other
+  #              way round. (06310's memory begins 7B 6D and then fills an
+  #              empty board, which is at least not against it.)
   #   below 0x40, standing where an event would begin: firmware 4.0 writes
   #              one to four such bytes between events. Time stamps,
   #              presumably; skipped.
 
   @ee_powerup 0x6A
+  @ee_eof 0x6B
+  @ee_empty_board 0x6D
   @ee_beginpos 0x6F
+  @ee_beginpos_rot 0x7A
   @ee_start_tag 0x7B
   @ee_watchdog 0x7C
 
@@ -302,7 +333,8 @@ defmodule Arkab.Dgt.Bus do
   - `{:field, square, piece}` - `piece` as in a dump, `nil` for empty;
   - `{:clock, :white | :black, ms}` - a time the board wrote down, which it
     does when the clock's lever goes over;
-  - `:power_up`, `:start_position`, `:start_mark`, `:restarted`;
+  - `:power_up`, `:start_position`, `:start_position_rotated`,
+    `:start_mark`, `:restarted`, `:empty_board`, `:end_of_data`;
   - nothing for the bytes that are time stamps or marks nobody needs.
 
   An event cut off by the end of the data is dropped.
@@ -321,10 +353,34 @@ defmodule Arkab.Dgt.Bus do
 
   defp changes(<<@ee_powerup, rest::binary>>, acc), do: changes(rest, [:power_up | acc])
   defp changes(<<@ee_beginpos, rest::binary>>, acc), do: changes(rest, [:start_position | acc])
+
+  defp changes(<<@ee_beginpos_rot, rest::binary>>, acc),
+    do: changes(rest, [:start_position_rotated | acc])
+
+  defp changes(<<@ee_eof, rest::binary>>, acc), do: changes(rest, [:end_of_data | acc])
+  defp changes(<<@ee_empty_board, rest::binary>>, acc), do: changes(rest, [:empty_board | acc])
   defp changes(<<@ee_start_tag, rest::binary>>, acc), do: changes(rest, [:start_mark | acc])
   defp changes(<<@ee_watchdog, rest::binary>>, acc), do: changes(rest, [:restarted | acc])
   defp changes(<<_other, rest::binary>>, acc), do: changes(rest, acc)
   defp changes(<<>>, acc), do: Enum.reverse(acc)
+
+  @max_history 20_000
+
+  @doc """
+  The events of a board's memory read back (a "from start" answer, or the
+  single-board `ee_moves`), for the `{:history, events}` a driver sends:
+  `changes/1`, at most `max_history/0` of them - the newest, when there
+  are more. A memory is a few thousand bytes; anything much longer is not
+  one, and is not passed on whole.
+  """
+  def history(data) when is_binary(data) do
+    events = changes(data)
+    excess = length(events) - @max_history
+    if excess > 0, do: Enum.drop(events, excess), else: events
+  end
+
+  @doc "The most events a history carries."
+  def max_history, do: @max_history
 
   defp bcd(byte), do: (byte >>> 4 &&& 0x07) * 10 + (byte &&& 0x0F)
 

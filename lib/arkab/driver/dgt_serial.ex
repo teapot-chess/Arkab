@@ -28,6 +28,10 @@ defmodule Arkab.Driver.DgtSerial do
      `retry_ms` (3 s) until the board is back. Three messages in a row that
      make no sense do the same - a second board plugged into the line later
      is found that way.
+  5. the first resync of each opening also asks for the board's memory
+     (`ee_moves`, sent on as `{:history, events}`, see
+     `Arkab.Dgt.Bus.history/1`): what it wrote down while nobody read it.
+     A board that never answers it loses nothing but that.
 
   Apart from the question of step 1, which is asked and waited for, it
   never sleeps and never blocks: everything is a message.
@@ -65,6 +69,10 @@ defmodule Arkab.Driver.DgtSerial do
   alias Arkab.{Driver, Transport}
   alias Arkab.Dgt.{Bus, Loop, Protocol}
 
+  # The longest a memory is waited for: 16 kB, the most a message can say
+  # it holds, takes 17 seconds at 9600 baud.
+  @history_ms 20_000
+
   @impl Arkab.Driver
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts)
 
@@ -83,6 +91,14 @@ defmodule Arkab.Driver.DgtSerial do
       board: nil,
       connected?: false,
       last_dump: nil,
+      last_rx: nil,
+      # The board's memory: `:owed` from the handshake to the first resync,
+      # which asks for it (the opening's bytes are pinned in the bridge
+      # contract, and "nothing more until the first resync" is part of it).
+      history: nil,
+      # Until when it may still be on its way: one long message, during
+      # which nothing else arrives.
+      history_until: nil,
       # Messages that made no sense since the last whole board.
       noise: 0,
       clock?: options["clock"] != false,
@@ -160,7 +176,7 @@ defmodule Arkab.Driver.DgtSerial do
       |> ask_clock()
 
     Process.send_after(self(), :resync, state.resync_ms)
-    {:noreply, %{state | last_dump: now()}}
+    {:noreply, %{state | last_dump: now(), history: :owed}}
   end
 
   def handle_info(:open, state), do: {:noreply, state}
@@ -170,7 +186,8 @@ defmodule Arkab.Driver.DgtSerial do
   def handle_info(:resync, state) do
     cond do
       # No whole board for that long: nobody there, or nothing but noise.
-      now() - state.last_dump > state.timeout_ms ->
+      # While its memory comes in, a board that is still sending is there.
+      now() - heard_at(state) > state.timeout_ms ->
         {:noreply, drop(state, :timeout)}
 
       # Messages that are no messages, again and again: more than one board
@@ -180,7 +197,7 @@ defmodule Arkab.Driver.DgtSerial do
 
       true ->
         Process.send_after(self(), :resync, state.resync_ms)
-        {:noreply, state |> write(:board) |> ask_clock() |> ask_unknown()}
+        {:noreply, state |> write(:board) |> ask_clock() |> ask_unknown() |> ask_history()}
     end
   end
 
@@ -208,7 +225,7 @@ defmodule Arkab.Driver.DgtSerial do
     Driver.emit(state.owner, state.id, {:raw, :rx, bytes})
 
     {messages, rest} = Protocol.parse(state.buffer <> bytes)
-    state = %{state | buffer: rest}
+    state = %{state | buffer: rest, last_rx: now()}
 
     state =
       if Enum.any?(messages, &(not match?({:unknown, _, _}, &1))) and not state.connected? do
@@ -227,6 +244,22 @@ defmodule Arkab.Driver.DgtSerial do
   end
 
   defp message({:unknown, _id, _data}, state), do: %{state | noise: state.noise + 1}
+
+  # Its memory: sent on as it is, for whoever keeps the game.
+  defp message({:ee_moves, data}, state) do
+    Driver.emit(state.owner, state.id, {:history, Bus.history(data)})
+    %{state | history_until: nil}
+  end
+
+  # Its memory, cut short on the line: let go of. The moves it is making now
+  # still come in; only what it did while nobody listened stays unread.
+  defp message({:ee_moves_cut, received}, state) do
+    Logger.warning(
+      "board #{state.port}: its memory was cut short after #{received} bytes; left unread"
+    )
+
+    %{state | history_until: nil}
+  end
 
   # A change to a board we have not seen whole: ask for the whole of it.
   defp message({:field, _square, _piece}, %{board: nil} = state), do: write(state, :board)
@@ -290,6 +323,20 @@ defmodule Arkab.Driver.DgtSerial do
        do: write(%{state | clock_asks: asks + 1}, :clock)
 
   defp ask_clock(state), do: state
+
+  # What it wrote down while nobody was reading it: one long message, asked
+  # for once per opening. Update mode is asked for again after it, in case
+  # the question took the board out of it (DGT's text does not say; no
+  # board on its own line was asked this yet).
+  defp ask_history(%{history: :owed} = state) do
+    update = if state.clock?, do: :update_nice, else: :update_board
+
+    %{state | history: :asked, history_until: now() + @history_ms}
+    |> write(:ee_moves)
+    |> write(update)
+  end
+
+  defp ask_history(state), do: state
 
   # The same for the serial number and the firmware: asked in the handshake
   # straight after a reset, where a board can drop them, and then "Board" is
@@ -359,6 +406,13 @@ defmodule Arkab.Driver.DgtSerial do
     Process.send_after(self(), :open, state.retry_ms)
     %{state | handle: nil, connected?: false, board: nil, buffer: <<>>}
   end
+
+  defp heard_at(%{history_until: until, last_rx: rx} = state)
+       when is_integer(until) and is_integer(rx) do
+    if now() < until, do: max(state.last_dump, rx), else: state.last_dump
+  end
+
+  defp heard_at(state), do: state.last_dump
 
   defp now, do: System.monotonic_time(:millisecond)
 end

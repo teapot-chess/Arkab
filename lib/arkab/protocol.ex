@@ -177,12 +177,29 @@ defmodule Arkab.Protocol do
   def event_fields({:raw, direction, bytes}) when direction in [:rx, :tx],
     do: %{"k" => to_string(direction), "h" => Base.encode16(bytes, case: :lower)}
 
+  def event_fields({:history, events}) when is_list(events),
+    do: %{"k" => "hist", "h" => Enum.flat_map(events, &history_item/1)}
+
   def event_fields({:info, info}) when is_map(info) do
     fields = for {key, value} <- info, key in @info_keys, into: %{}, do: {to_string(key), value}
     %{"k" => "info", "i" => fields}
   end
 
   def event_fields(_other), do: nil
+
+  # The marks a board writes in its memory (`Arkab.Dgt.Bus.changes/1`),
+  # by name. Nothing else travels.
+  @marks ~w(power_up start_position start_position_rotated start_mark restarted empty_board end_of_data)a
+  @mark_names Map.new(@marks, &{to_string(&1), &1})
+
+  defp history_item({:field, square, piece}) when square in 0..63,
+    do: [%{"f" => square, "p" => Board.letter(piece)}]
+
+  defp history_item({:clock, side, ms}) when side in [:white, :black] and is_integer(ms),
+    do: [%{"c" => to_string(side), "ms" => ms}]
+
+  defp history_item(mark) when mark in @marks, do: [%{"m" => to_string(mark)}]
+  defp history_item(_other), do: []
 
   @doc """
   An event as it arrived: `{:ok, %{seq, id, t, at, event}}` - `at` is
@@ -249,7 +266,40 @@ defmodule Arkab.Protocol do
       for({k, v} <- fields, is_map_key(@info_names, k), into: %{}, do: {@info_names[k], v})}}
   end
 
+  # A memory read back is taken whole or not at all: one item that is not
+  # one is a history nobody can vouch for.
+  defp event(%{"k" => "hist", "h" => items}) when is_list(items) do
+    items
+    |> Enum.reduce_while([], fn item, acc ->
+      case history_event(item) do
+        {:ok, event} -> {:cont, [event | acc]}
+        :error -> {:halt, :error}
+      end
+    end)
+    |> case do
+      :error -> :error
+      events -> {:ok, {:history, Enum.reverse(events)}}
+    end
+  end
+
   defp event(_other), do: :error
+
+  defp history_event(%{"f" => square, "p" => letter})
+       when is_integer(square) and square in 0..63 do
+    case Board.from_letter(letter) do
+      {:ok, piece} -> {:ok, {:field, square, piece}}
+      :error -> :error
+    end
+  end
+
+  defp history_event(%{"c" => side, "ms" => ms})
+       when side in ["white", "black"] and is_integer(ms) and ms >= 0,
+       do: {:ok, {:clock, String.to_existing_atom(side), ms}}
+
+  defp history_event(%{"m" => name}) when is_map_key(@mark_names, name),
+    do: {:ok, Map.fetch!(@mark_names, name)}
+
+  defp history_event(_other), do: :error
 
   defp side("white", _default), do: :white
   defp side("black", _default), do: :black

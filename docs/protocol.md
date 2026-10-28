@@ -70,6 +70,15 @@ Raw serial bytes are never sent. They go to the bridge's own capture files
 while recording is on, and stay there. Successful polls are thinned to one
 a second; a missed poll is always sent. The answer that is sent carries `"n"`, how many answers it stands for (left out when 1), so a server can count answered against missed; a server that ignores `n` reads one per second, as before, and a bridge that never sends it reads as one.
 
+A board's memory read back travels as one event, `{"k": "hist", "h": [...]}`:
+what the board wrote down itself, oldest first, sent when the board is met,
+comes back, or says it was switched on (`Arkab.Dgt.Bus.history/1`). Each
+item is a square that changed (`{"f": 36, "p": "P"}`, `"."` for empty), a
+clock time written when the lever went over (`{"c": "white", "ms":
+5421000}`), or a mark (`{"m": "power_up"}`). A server that does not know
+`hist` drops it and acknowledges it like any other event, which is what an
+older Alnasl does; a server that does takes the whole history or none of it.
+
 ### Delivery
 
 - The bridge writes every event to its SQLite queue before it sends it anywhere. A power cut loses what the board had not said yet, and nothing it had.

@@ -36,7 +36,18 @@ defmodule Arkab.Driver.DgtBus do
   A board met for the first time (or back after being away) is first asked
   what changed - the answer is its whole memory since it was switched on,
   up to a second and a half of it, and is thrown away - then its version,
-  then its whole board.
+  then its whole board, then its memory ("from start", sent on as
+  `{:history, events}`). The memory is asked for again when "what changed?"
+  says the board was switched off and on, or restarted itself.
+
+  ## Its memory, one board at a time
+
+  A memory is a second and a half of line, and while it comes nobody else
+  is asked anything. So only one board's memory is asked for at a time, and
+  `history_gap_ms` (500) of ordinary questions to everybody go between two
+  of them: twelve boards coming back at once are read back one after the
+  other, while the moves on all twelve keep coming in. A memory that does
+  not come back whole is asked for once more, then left unread.
 
   ## Why a dump as well
 
@@ -103,12 +114,27 @@ defmodule Arkab.Driver.DgtBus do
     :dump_ms,
     :clock_ms,
     :discover_ms,
+    :history_gap_ms,
     :stranger
   ]
+
+  # What a board is asked first, each time it is met: what changed since it
+  # was switched on (thrown away), its version, its whole board, and its
+  # memory (`:history`, sent on as `{:history, events}`).
+  @met [:flush, :version, :board, :history]
+
+  # A memory that did not come back whole is asked for this many times.
+  @history_tries 2
 
   # The longest a board is ever given to begin an answer, once it has shown
   # that it needs more than the default (it answered late, so it is there).
   @slowest_reply_ms 1_000
+
+  # How long a memory may take to come back before another board's is
+  # asked for: the longest a real one took (1467 bytes, a second and a
+  # half), and room for one five times that. The answer's own silence
+  # (`reply_ms`) ends a memory that stopped coming long before this.
+  @slowest_history_ms 8_000
 
   # --- a board on the bus ------------------------------------------------------
 
@@ -229,7 +255,11 @@ defmodule Arkab.Driver.DgtBus do
       clock_ms: Keyword.get(opts, :clock_ms, 1_000),
       discover_ms:
         Keyword.get(opts, :discover_ms) || Application.get_env(:arkab, :loop_discover_ms, 10_000),
-      retry_ms: Keyword.get(opts, :retry_ms, 3_000)
+      retry_ms: Keyword.get(opts, :retry_ms, 3_000),
+      # One board's memory at a time, and this long between two of them:
+      # the others are asked what changed in between (`question/3`).
+      history_gap_ms: Keyword.get(opts, :history_gap_ms, 500),
+      history_free_at: now()
     }
 
     send(self(), :open)
@@ -251,7 +281,8 @@ defmodule Arkab.Driver.DgtBus do
       answered: 0,
       missed: 0,
       # What a board is asked before the rotation's usual questions.
-      todo: [:flush, :version, :board],
+      todo: @met,
+      history_tries: 0,
       dump_at: now(),
       clock_at: now(),
       retry_at: now(),
@@ -406,6 +437,8 @@ defmodule Arkab.Driver.DgtBus do
         do: update_in(state.boards[waiting.address], &missed(&1, state)),
         else: state
 
+    state = if waiting.kind == :history, do: history_missed(state, waiting.address), else: state
+
     again(state)
     {:noreply, state}
   end
@@ -461,9 +494,15 @@ defmodule Arkab.Driver.DgtBus do
     board = state.boards[address]
 
     if board.connected? or now >= board.retry_at do
-      kind = question(board, now)
+      kind = question(board, now, state)
       order = List.delete(state.order, address) ++ [address]
       state = %{state | order: order}
+
+      # Nobody else's memory until this one is in, or given up on.
+      state =
+        if kind == :history,
+          do: %{state | history_free_at: now + @slowest_history_ms},
+          else: state
 
       state =
         if kind == :changes do
@@ -481,9 +520,17 @@ defmodule Arkab.Driver.DgtBus do
     end
   end
 
-  defp question(%{todo: [first | _]}, _now), do: first
+  # A memory is asked for when no other board's is on its way or just was:
+  # until then the board is asked what it is always asked.
+  defp question(%{todo: [:history | rest]} = board, now, state) do
+    if now >= state.history_free_at,
+      do: :history,
+      else: question(%{board | todo: rest}, now, state)
+  end
 
-  defp question(board, now) do
+  defp question(%{todo: [first | _]}, _now, _state), do: first
+
+  defp question(board, now, _state) do
     cond do
       now >= board.dump_at -> :board
       now >= board.clock_at -> :clock
@@ -492,6 +539,7 @@ defmodule Arkab.Driver.DgtBus do
   end
 
   defp command(:flush), do: :changes
+  defp command(:history), do: :from_start
   defp command(:ignore), do: :ignore_next_ping
   defp command(:verify), do: :ping
   defp command(kind), do: kind
@@ -543,6 +591,9 @@ defmodule Arkab.Driver.DgtBus do
         |> answered()
         |> into_capture(waiting, message)
         |> take(kind, message, address, t, state)
+
+      state =
+        if kind == :history, do: %{state | history_free_at: t + state.history_gap_ms}, else: state
 
       put_in(state.boards[address], board)
     else
@@ -632,6 +683,7 @@ defmodule Arkab.Driver.DgtBus do
   defp fits?(:clock, {:clock, _}), do: true
   defp fits?(:clock, {:clock_ack, _}), do: true
   defp fits?(:version, {:version, _}), do: true
+  defp fits?(:history, {:from_start, _}), do: true
   defp fits?(:ignore, {:ping, _}), do: true
   defp fits?(_kind, _message), do: false
 
@@ -655,6 +707,13 @@ defmodule Arkab.Driver.DgtBus do
 
   # The board's whole memory since it was switched on: not news.
   defp take(board, :flush, _message, _address, _t, _state), do: done(board, :flush)
+
+  # Its memory read back: sent on as it is, for whoever keeps the game.
+  defp take(board, :history, {:from_start, data}, _address, _t, _state) do
+    Driver.emit(board.owner, board.id, {:history, Bus.history(data)})
+    %{done(board, :history) | history_tries: 0}
+  end
+
   defp take(board, :ignore, _message, _address, _t, _state), do: board
 
   defp take(board, :version, {:version, version}, address, _t, _state) do
@@ -686,9 +745,10 @@ defmodule Arkab.Driver.DgtBus do
       {:clock, _side, _ms}, board ->
         %{board | clock_at: t}
 
-      # It was off, or restarted itself: its picture is not ours any more.
+      # It was off, or restarted itself: its picture is not ours any more,
+      # and what it wrote down meanwhile is read back.
       event, board when event in [:power_up, :restarted] ->
-        %{board | dump_at: t}
+        %{board | dump_at: t, todo: wants_history(board.todo), history_tries: 0}
 
       _other, board ->
         board
@@ -724,6 +784,31 @@ defmodule Arkab.Driver.DgtBus do
   defp done(%{todo: [kind | rest]} = board, kind), do: %{board | todo: rest}
   defp done(board, _kind), do: board
 
+  defp wants_history(todo), do: if(:history in todo, do: todo, else: todo ++ [:history])
+
+  # A memory that did not come back, or not whole (a bad checksum is a miss
+  # too): the slot is free again, and the board is asked once more - then
+  # left alone. Its moves still come in as they are made; only what it did
+  # while nobody listened stays unread.
+  defp history_missed(state, address) do
+    state = %{state | history_free_at: now() + state.history_gap_ms}
+
+    case state.boards[address] do
+      %{history_tries: tries} = board when tries + 1 >= @history_tries ->
+        Logger.warning(
+          "board bus #{state.port}: #{address} did not send its memory in #{tries + 1} tries; left unread"
+        )
+
+        put_in(state.boards[address], %{board | history_tries: 0, todo: board.todo -- [:history]})
+
+      %{} = board ->
+        put_in(state.boards[address], %{board | history_tries: board.history_tries + 1})
+
+      nil ->
+        state
+    end
+  end
+
   defp position(%{board: squares} = board, squares), do: board
 
   defp position(board, squares) do
@@ -757,7 +842,7 @@ defmodule Arkab.Driver.DgtBus do
     cond do
       misses == state.lost_after and board.connected? ->
         Driver.emit(board.owner, board.id, :disconnected)
-        %{board | connected?: false, board: nil, todo: [:flush, :version, :board]}
+        %{board | connected?: false, board: nil, todo: @met, history_tries: 0}
 
       true ->
         board
@@ -812,7 +897,7 @@ defmodule Arkab.Driver.DgtBus do
         if board.connected?, do: Driver.emit(board.owner, board.id, :disconnected)
 
         {address,
-         %{board | connected?: false, board: nil, misses: 0, todo: [:flush, :version, :board]}}
+         %{board | connected?: false, board: nil, misses: 0, todo: @met, history_tries: 0}}
       end)
 
     if state.waiting, do: Process.cancel_timer(state.waiting.timer)

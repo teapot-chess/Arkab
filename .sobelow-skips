@@ -13,9 +13,12 @@ Traversal.FileModule: Directory Traversal in `File.open`,lib/arkab/launcher_deta
 Traversal.FileModule: Directory Traversal in `File.open`,lib/arkab/recorder.ex:126,5540A3C
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/capture.ex:63,2940F15
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/launcher_details/cli.ex:265,4413F15
+Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/pin_request.ex:59,3AD70FD
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/updates.ex:384,EBBAE1
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab_web/endpoint.ex:67,29757F3
 Traversal.FileModule: Directory Traversal in `File.rm`,lib/arkab/launcher_details.ex:131,588A32
+Traversal.FileModule: Directory Traversal in `File.rm`,lib/arkab/pin_request.ex:60,32BD559
+Traversal.FileModule: Directory Traversal in `File.rm`,lib/arkab/pin_request.ex:65,735FD66
 Traversal.FileModule: Directory Traversal in `File.rm`,lib/arkab/recorder.ex:149,2FEA606
 Traversal.FileModule: Directory Traversal in `File.write!`,lib/arkab_web/endpoint.ex:73,231F395
 Traversal.FileModule: Directory Traversal in `File.write`,lib/arkab/launcher_details.ex:159,7944FD6

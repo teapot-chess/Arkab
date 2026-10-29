@@ -80,6 +80,15 @@ defmodule ArkabWeb.HelpLive do
           <code>tailscale serve</code>
           of een reverse proxy) "Pincode invoeren" aan, en de juiste pincode geeft die browser 12 uur lang alle knoppen, of tot je op "Weer vergrendelen" drukt. Een pincode wijzigen of verwijderen vergrendelt alle ontgrendelde browsers weer. Vijf foute pogingen sluiten een adres 5 minuten buiten. De pincode instellen, wijzigen of verwijderen kan alleen op de brug zelf, nooit vanuit een ontgrendelde browser. De pagina draait op gewoon HTTP, dus de pincode gaat onversleuteld over het netwerk van de zaal: het is een slot voor de zaal, geen beveiliging tegen het internet. Zonder pincode verandert er niets: vanaf een andere computer blijft de pagina alleen-lezen.
         </p>
+
+        <p>
+          Een brug zonder scherm en toetsenbord (het Raspberry Pi-image) krijgt de pincode ook via de SD-kaart: stop de kaart in een computer, open
+          <code>alnasl-arkab-pin.txt</code>
+          in de opstartmap van de kaart, vul de regel <code>PIN=</code>
+          in (4 tot 64 tekens, cijfers mogen) en stop de kaart terug. Bij het opstarten geeft de kast de pincode aan Arkab, maakt de regel weer leeg zodat de pincode niet op de kaart blijft staan, en zet het resultaat onderaan het bestand.
+          <code>PIN=verwijderen</code>
+          haalt de pincode weg. Dit is de enige weg naast de pagina van de brug zelf, en je hebt er de kaart voor nodig.
+        </p>
       </section>
 
       <section id="help-servers">
@@ -208,6 +217,15 @@ defmodule ArkabWeb.HelpLive do
           The other way is a remote PIN. On the bridge itself, under "This program", set a PIN of at least 4 characters. From then on the read-only banner on another computer (a phone or laptop on the hall's network, or through
           <code>tailscale serve</code>
           or a reverse proxy) offers "Enter PIN", and the right PIN gives that browser every button for 12 hours, or until you press "Lock again". Changing or removing the PIN locks every unlocked browser again. Five wrong tries lock an address out for 5 minutes. The PIN can only be set, changed or removed on the bridge itself, never from an unlocked browser. The page is plain HTTP, so the PIN crosses the hall's network in clear: it is a lock for the hall, not security against the internet. Without a PIN nothing changes: from another computer the page stays read-only.
+        </p>
+
+        <p>
+          A bridge with no screen and no keyboard (the Raspberry Pi image) can be given its PIN on the SD card instead: put the card in a computer, open
+          <code>alnasl-arkab-pin.txt</code>
+          in the card's boot folder, fill in the <code>PIN=</code>
+          line (4 to 64 characters, digits are fine) and put the card back. At boot the box hands the PIN to Arkab, empties the line again so the PIN does not stay on the card, and writes the result at the bottom of the file.
+          <code>PIN=remove</code>
+          takes the PIN away. This is the only way besides the bridge's own page, and it needs the card in your hand.
         </p>
       </section>
 

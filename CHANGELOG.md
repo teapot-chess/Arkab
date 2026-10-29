@@ -15,6 +15,10 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-29
+
+- [Feature] **The remote PIN can be given on the SD card, for a box with no screen.** A Raspberry Pi in a hall cupboard has no keyboard to type a PIN on, and the page only lets the machine itself set one. On the Pi image the boot partition now carries `alnasl-arkab-pin.txt`; the organiser fills in `PIN=` on a PC, and at boot the box checks it (4 to 64 characters), leaves a request file in Arkab's data folder (mode 0600, the arkab user's) and empties the PIN line again, with the result written at the bottom of the file, so a mistake is visible when the card comes back. Arkab reads the request file when it starts, before the page answers, applies it and deletes it whatever came of it; `PIN=remove` removes the PIN. Setting or removing it counts the PIN's generation up like any other change, so every unlocked browser is locked again. A symlink where the request file should be is deleted unread, and the PIN is never logged. Nothing listens and nothing a visitor sends reaches this: the page still cannot set the PIN, and now the card has to be in somebody's hand. `Arkab.PinRequest`, nine tests.
+
 ## [0.5.0] - 2026-10-28
 
 - [Security] **Bandit 1.14.1.** A fresh advisory against 1.14.0 (HTTP/2 bodies sent one byte a frame, to make the server hoard memory) turned the dependency audit red the day 1.14.1 came out to fix it. The audit is green again; the bridge never spoke HTTP/2 to anybody, but the audit does not grade on intent.

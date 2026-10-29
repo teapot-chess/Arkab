@@ -77,7 +77,12 @@ defmodule Arkab.Bridge do
   defp web(opts) do
     if Keyword.get(opts, :web, false) do
       ArkabWeb.Endpoint.ensure_secret(Path.join(Keyword.fetch!(opts, :data_dir), "secret"))
-      [ArkabWeb.Pin.Throttle, ArkabWeb.Endpoint]
+      # The PIN a box with no screen was given on its SD card, applied before the page answers.
+      [
+        {Arkab.PinRequest, Keyword.fetch!(opts, :data_dir)},
+        ArkabWeb.Pin.Throttle,
+        ArkabWeb.Endpoint
+      ]
     else
       []
     end

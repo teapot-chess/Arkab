@@ -132,4 +132,17 @@ defmodule Arkab.DgtBusTest do
     assert log =~ ~r/6310 did not answer \w+ within \d+ ms: \d+ bytes came back/
     assert log =~ "damaged (bad checksum)"
   end
+
+  test "a long answer that dies on a zero byte is a line without DTR and RTS" do
+    # The real one: a board dump (0x83, 70 bytes declared) that stopped after 13.
+    cut = Base.decode16!("830046354f0203040506040300", case: :lower)
+
+    assert Arkab.Dgt.Bus.dropped_mid_answer?(:board, cut)
+    # Not the answer that was asked for, not cut short, not ending in zero, not a header.
+    refute Arkab.Dgt.Bus.dropped_mid_answer?(:changes, cut)
+    refute Arkab.Dgt.Bus.dropped_mid_answer?(:board, binary_part(cut, 0, 12))
+    refute Arkab.Dgt.Bus.dropped_mid_answer?(:board, <<0x83, 0x00, 0x06, 1, 2, 0>>)
+    refute Arkab.Dgt.Bus.dropped_mid_answer?(:board, <<0x83, 0x00>>)
+    refute Arkab.Dgt.Bus.dropped_mid_answer?(:board, <<>>)
+  end
 end

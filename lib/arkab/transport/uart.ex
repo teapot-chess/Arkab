@@ -16,6 +16,16 @@ defmodule Arkab.Transport.Uart do
   The `tty.` one is for dial-in: opening it waits for a modem's carrier
   signal, which a chess board never sends. Only the `cu.` one is offered
   (`one_per_device/1`), so nobody has to know that.
+
+  DTR and RTS are switched on after every open. A DGT RS-232 board has no
+  power supply for its transmitter: it borrows the voltage from the host's
+  DTR and RTS lines. Windows' driver turns RTS on by itself and
+  `circuits_uart` asks for it there; on a Unix it asks for neither, and a
+  Mac leaves whatever the adapter's driver feels like. The result, seen on
+  three boards behind an FTDI adapter: short answers arrive, every long one
+  fades out after a few bytes with a zero last, and DGT's own LiveChess
+  (which asserts both) works on the same desk. So we assert both as well,
+  on every system and for both drivers (`power_line/3`).
   """
 
   @behaviour Arkab.Transport
@@ -96,6 +106,7 @@ defmodule Arkab.Transport.Uart do
       with {:ok, pid} <- apply(uart(), :start_link, []) do
         case apply(uart(), :open, [pid, port, settings]) do
           :ok ->
+            power_line(uart(), pid, port)
             {:ok, pid}
 
           failed ->
@@ -109,6 +120,33 @@ defmodule Arkab.Transport.Uart do
     else
       {:error, :no_serial_library}
     end
+  end
+
+  @doc """
+  Asserts DTR and RTS on an open port, through `module` (`Circuits.UART` in
+  life, a stand-in in the test). A failure is logged and swallowed: a port
+  that opened is better than a port that did not, even a stingy one.
+  """
+  def power_line(module, pid, port) do
+    for {name, line} <- [dtr: :set_dtr, rts: :set_rts] do
+      case apply(module, line, [pid, true]) do
+        :ok ->
+          :ok
+
+        other ->
+          Logger.warning("serial port #{port}: could not turn #{name} on: #{inspect(other)}")
+      end
+    end
+
+    :ok
+  catch
+    kind, reason ->
+      Logger.warning(
+        "serial port #{port}: could not turn DTR and RTS on: " <>
+          Exception.format(kind, reason, __STACKTRACE__)
+      )
+
+      :ok
   end
 
   @impl true

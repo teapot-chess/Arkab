@@ -428,7 +428,7 @@ defmodule Arkab.Driver.DgtBus do
     if state.debug? or run_starts?(state, waiting.address) do
       Logger.warning(
         "board bus #{state.port}: #{waiting.address} did not answer #{waiting.kind} " <>
-          "within #{reply_ms(state, waiting.address)} ms: #{heard(waiting)}"
+          "within #{reply_ms(state, waiting.address)} ms: #{heard(waiting)}#{line_hint(waiting)}"
       )
     end
 
@@ -662,6 +662,16 @@ defmodule Arkab.Driver.DgtBus do
 
     "#{byte_size(waiting.rx)} bytes came back from #{waiting.first_byte_at - waiting.at} ms on" <>
       "#{damaged}: #{Base.encode16(shown, case: :lower)}#{more}"
+  end
+
+  # A long answer that stops dead on a zero byte is not a mute board, it is
+  # a line without power: see `Arkab.Dgt.Bus.dropped_mid_answer?/2`.
+  defp line_hint(waiting) do
+    if Bus.dropped_mid_answer?(command(waiting.kind), waiting.rx),
+      do:
+        "; the line dropped mid-answer - on a Mac or a new adapter, " <>
+          "check that DTR and RTS are on",
+      else: ""
   end
 
   defp reply_ms(state, address) do

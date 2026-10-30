@@ -16,4 +16,18 @@ defmodule Arkab.Transport.UartTest do
       assert links.() == before
     end
   end
+
+  defmodule Recorder do
+    @moduledoc "Stands in for Circuits.UART: remembers which lines were asked for."
+    def set_dtr(pid, on), do: send(pid, {:line, :dtr, on}) && :ok
+    def set_rts(pid, on), do: send(pid, {:line, :rts, on}) && {:error, :enotty}
+  end
+
+  # A DGT RS-232 board powers its transmitter from DTR and RTS. A Mac that is
+  # asked for neither gives long answers that stop after a few bytes.
+  test "an opened port is asked for DTR and RTS, and a refusal does not matter" do
+    assert :ok = Uart.power_line(Recorder, self(), "/dev/cu.usbserial-test")
+    assert_received {:line, :dtr, true}
+    assert_received {:line, :rts, true}
+  end
 end

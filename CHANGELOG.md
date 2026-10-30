@@ -15,6 +15,9 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+- [Security] **phoenix_html 4.4.0.** A medium advisory against 4.3.0 (EEF-CVE-2026-117645) turned the dependency audit red; the update clears it.
+- [Fix] **Long answers from serial boards no longer stop after a few bytes on a Mac.** A DGT RS-232 board has no power for its transmitter and borrows it from the host's DTR and RTS lines. Windows turns RTS on by itself; on a Mac nothing did, so three boards on a loop behind an FTDI adapter answered short questions and let every long one (the whole-board dump) fade out after 5 to 18 bytes, the last of them a zero, while DGT's own software worked on the same desk. The port now asks for DTR and RTS as soon as it is open, on every system, for a single board and for a loop. If the system refuses, that is logged and the port is used anyway. `Arkab.Transport.Uart.power_line/3`; the call is tested with a stand-in, the real adapter is not.
+- [Change] **The log says when a line dropped in the middle of an answer.** "Did not answer" now ends with a hint to check DTR and RTS when what came back began like the answer asked for, was shorter than it said it would be, and ended on a zero byte. `Arkab.Dgt.Bus.dropped_mid_answer?/2`.
 - [Change] **The page fits a 3.5 inch screen.** A hall box with a 480x320 panel (or 320x480 turned upright) showed the page as a desktop one: margins fit for a monitor, a footer of links 22 pixels tall, and checkboxes smaller than the stylus holding them. Under 520 pixels wide or 360 tall the margins shrink, the headings follow, the Help and language links and the two checkboxes get 44 pixel targets, and nothing scrolls sideways. A bigger screen sees the same page it always did. Sections still stack, so the page scrolls; a 320 pixel strip can be many things, but it is not a monitor. `ArkabWeb.CompactCssTest`.
 
 ## [0.5.1] - 2026-10-29

@@ -243,6 +243,24 @@ defmodule Arkab.Dgt.Bus do
   def serial(_address, _firmware), do: nil
 
   @doc """
+  Did these bytes begin the answer to `kind` (a command name, as the
+  question was asked: `:board`, `:changes`, `:from_start`...), stop short of
+  the length the answer itself declared, and
+  end on a zero byte? That is not a board that is mute. That is a line that
+  lost its power halfway: a DGT RS-232 board takes the voltage it transmits
+  with from the host's DTR and RTS lines, and when those are not asserted a
+  short answer squeaks through and a long one fades out, zeros last.
+  """
+  def dropped_mid_answer?(kind, rx) when is_binary(rx) do
+    with id when is_integer(id) <- Map.get(@answers, kind),
+         <<first, hi, lo, _::binary>> when hi < 0x80 and lo < 0x80 <- rx do
+      first == (0x80 ||| id) and byte_size(rx) < (hi <<< 7 ||| lo) and :binary.last(rx) == 0
+    else
+      _other -> false
+    end
+  end
+
+  @doc """
   Takes bytes from the loop and returns the complete answers in them and the
   rest: `{[{address, message} | {:bad_checksum, address | nil}], rest}` - a
   damaged answer with the address it seemed to carry.

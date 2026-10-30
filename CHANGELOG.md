@@ -15,6 +15,8 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+- [Security] **A reverse proxy that says `Forwarded` or `cf-connecting-ip` no longer makes every visitor "this machine".** The page's local check looked for those two headers on a socket that is only ever handed headers starting with `x-`, so it looked very carefully at nothing. Behind a proxy that sent only those, every remote visitor arrived from loopback with a clean record and got the controls, PIN setting included. The page's HTTP request, which sees every header, now writes its verdict into the session, and the socket needs that verdict and its own; a missing header list counts as a proxy. No verdict, not local. `ArkabWeb.Local`, three tests.
+
 ## [0.5.2] - 2026-10-30
 
 - [Security] **phoenix_html 4.4.0.** A medium advisory against 4.3.0 (EEF-CVE-2026-117645) turned the dependency audit red; the update clears it.

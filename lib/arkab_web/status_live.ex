@@ -39,7 +39,7 @@ defmodule ArkabWeb.StatusLive do
        message: nil,
        update_message: nil,
        checking?: false,
-       local?: Local.local_socket?(socket),
+       local?: Local.local_socket?(socket, session),
        grant: session[Pin.session_key()],
        pin_message: nil,
        helping?: false,

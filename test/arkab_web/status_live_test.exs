@@ -132,6 +132,28 @@ defmodule ArkabWeb.StatusLiveTest do
       assert has_element?(view, "#read-only")
     end
 
+    # The socket only sees `x-` headers; these two it would never see.
+    for header <- ["forwarded", "cf-connecting-ip"] do
+      test "a loopback peer behind a `#{header}` header is not this machine" do
+        conn = build_conn() |> Plug.Conn.put_req_header(unquote(header), "for=203.0.113.9")
+        {:ok, view, _html} = live(conn, "/")
+        assert has_element?(view, "#read-only")
+        refute has_element?(view, "#join-form")
+      end
+    end
+
+    test "without the HTTP request's verdict the socket is not this machine" do
+      socket = %Phoenix.LiveView.Socket{
+        private: %{connect_info: %{peer_data: %{address: {127, 0, 0, 1}}, x_headers: []}}
+      }
+
+      refute ArkabWeb.Local.local_socket?(socket, %{})
+      assert ArkabWeb.Local.local_socket?(socket, %{"arkab_local" => true})
+
+      no_view = put_in(socket.private.connect_info.x_headers, nil)
+      refute ArkabWeb.Local.local_socket?(no_view, %{"arkab_local" => true})
+    end
+
     test "this machine gets the controls" do
       {:ok, view, _html} = live(build_conn(), "/")
       refute has_element?(view, "#read-only")

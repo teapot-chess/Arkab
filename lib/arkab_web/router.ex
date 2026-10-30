@@ -9,6 +9,7 @@ defmodule ArkabWeb.Router do
     plug ArkabWeb.Locale
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug ArkabWeb.Local
   end
 
   scope "/", ArkabWeb do

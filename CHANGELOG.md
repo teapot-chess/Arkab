@@ -15,6 +15,8 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+- [Change] **All rights reserved.** The Apache License 2.0 was a generous document for a program that has decided to keep its own counsel. LICENSE is now a short all-rights-reserved notice, and the README and NOTICE agree. Releases already published under the Apache licence keep it, since a licence granted cannot be taken back; the new terms apply from here on.
+
 ## [0.5.3] - 2026-11-01
 
 - [Security] **A reverse proxy that says `Forwarded` or `cf-connecting-ip` no longer makes every visitor "this machine".** The page's local check looked for those two headers on a socket that is only ever handed headers starting with `x-`, so it looked very carefully at nothing. Behind a proxy that sent only those, every remote visitor arrived from loopback with a clean record and got the controls, PIN setting included. The page's HTTP request, which sees every header, now writes its verdict into the session, and the socket needs that verdict and its own; a missing header list counts as a proxy. No verdict, not local. `ArkabWeb.Local`, three tests.

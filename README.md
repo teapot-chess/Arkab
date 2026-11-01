@@ -137,5 +137,6 @@ real sockets on free local ports.
 
 ## Licence
 
-Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). Arkab is not
-affiliated with any board maker.
+Copyright (c) 2026 teapot-chess. All rights reserved. No licence is granted to
+use, copy, modify or distribute this software. See [LICENSE](LICENSE) and
+[NOTICE](NOTICE). Arkab is not affiliated with any board maker.

@@ -86,10 +86,12 @@ defmodule ArkabWeb.HelpLive do
         </p>
 
         <p>
-          Een brug zonder scherm en toetsenbord (het Raspberry Pi-image) krijgt de pincode ook via de SD-kaart: stop de kaart in een computer, open
-          <code>alnasl-arkab-pin.txt</code>
-          in de opstartmap van de kaart, vul de regel <code>PIN=</code>
-          in (6 tot 64 tekens) en stop de kaart terug. Bij het opstarten geeft de box de pincode aan Arkab, maakt de regel weer leeg zodat de pincode niet op de kaart blijft staan, en zet het resultaat onderaan het bestand. Een box met een scherm toont de pincode ook daar. Dit is de enige weg naast de pagina van de brug zelf, en je hebt er de kaart voor nodig.
+          Op het Raspberry Pi-image staat de pincode ook op de SD-kaart, in
+          <code>alnasl-pin.txt</code>
+          in de opstartmap van de kaart, en een box met een scherm toont hem daar. Om hem te wijzigen stop je de kaart in een computer, vul je de regel
+          <code>PIN=</code>
+          in (6 tot 64 tekens, of <code>PIN=nieuw</code>
+          voor een willekeurige) en stop je de kaart terug. Bij het opstarten geeft de box de pincode aan Arkab en zet hij het resultaat onderaan het bestand. Een pincode die je hier op de brug wijzigt, komt ook in het bestand: het bevat altijd de huidige pincode. Verwijderen kan niet.
         </p>
       </section>
 
@@ -226,10 +228,11 @@ defmodule ArkabWeb.HelpLive do
         </p>
 
         <p>
-          A bridge with no screen and no keyboard (the Raspberry Pi image) can be given its PIN on the SD card instead: put the card in a computer, open
-          <code>alnasl-arkab-pin.txt</code>
-          in the card's boot folder, fill in the <code>PIN=</code>
-          line (6 to 64 characters) and put the card back. At boot the box hands the PIN to Arkab, empties the line again so the PIN does not stay on the card, and writes the result at the bottom of the file. A box with a screen shows the PIN there too. This is the only way besides the bridge's own page, and it needs the card in your hand.
+          On the Raspberry Pi image the PIN is also on the SD card, in <code>alnasl-pin.txt</code>
+          in the card's boot folder, and a box with a screen shows it there. To change it, put the card in a computer, fill in the
+          <code>PIN=</code>
+          line (6 to 64 characters, or <code>PIN=new</code>
+          for a random one) and put the card back. At boot the box hands the PIN to Arkab and writes the result at the bottom of the file. A PIN changed here on the bridge goes into the file too, so it always holds the current PIN. It cannot be removed.
         </p>
       </section>
 

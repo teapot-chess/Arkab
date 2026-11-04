@@ -4,13 +4,13 @@ defmodule ArkabWeb.StatusLive do
   or down, events waiting - changes on its own. In English or Dutch
   (`ArkabWeb.Words`); the help is `ArkabWeb.HelpLive`.
 
-  Anyone on the hall's network may look; only the machine itself may touch,
-  or a browser unlocked with the remote PIN (`ArkabWeb.Local.may_change?/2`,
-  `ArkabWeb.Pin`). The peer is read from the socket when the page mounts
-  (`local?`), the PIN grant from the session, and every event that changes
-  something asks again on the server, whatever the page drew: a button that is
-  not drawn is still an event anybody can send. The PIN itself is set, changed
-  and removed from this machine only (`local?`, never the grant).
+  This machine, or a browser unlocked with the access PIN
+  (`ArkabWeb.PinGate`, `ArkabWeb.Local.may_change?/2`, `ArkabWeb.Pin`); nobody
+  else gets the page at all. The peer is read from the socket when the page
+  mounts (`local?`), the PIN grant from the session, and both are asked again
+  every second and before every event that changes something: a PIN changed
+  or a grant run out sends an open page back to `/unlock`. The PIN itself is
+  shown and changed on this machine only (`local?`, never the grant).
   """
 
   use ArkabWeb, :live_view
@@ -19,11 +19,12 @@ defmodule ArkabWeb.StatusLive do
 
   alias Arkab.{Autostart, Box, Help, Updates}
   alias ArkabWeb.{Local, Pin, Words}
+  alias Phoenix.LiveView.JS
 
   # Everything that changes something. The rest of the events are none.
   @changing ~w(join update later update_check check_now autostart remove)
   # The PIN's own: this machine only, a grant is not enough.
-  @local_only ~w(pin_set pin_remove help upgrade_open upgrade_cancel upgrade switch_open switch_cancel switch)
+  @local_only ~w(pin_set pin_new pin_notice_ok help upgrade_open upgrade_cancel upgrade switch_open switch_cancel switch)
 
   @impl true
   def mount(_params, session, socket) do
@@ -42,6 +43,7 @@ defmodule ArkabWeb.StatusLive do
        local?: Local.local_socket?(socket, session),
        grant: session[Pin.session_key()],
        pin_message: nil,
+       pin_notice?: Pin.notice?(),
        helping?: false,
        help: nil,
        box: nil,
@@ -61,8 +63,13 @@ defmodule ArkabWeb.StatusLive do
   defp first_poll(socket), do: if(connected?(socket), do: poll_box(socket, true), else: socket)
 
   @impl true
-  def handle_info(:refresh, socket),
-    do: {:noreply, socket |> assign_access() |> load() |> poll_box()}
+  def handle_info(:refresh, socket) do
+    socket = assign_access(socket)
+
+    if socket.assigns.may_change?,
+      do: {:noreply, socket |> load() |> poll_box()},
+      else: {:noreply, locked_out(socket)}
+  end
 
   def handle_info(:update_changed, socket), do: {:noreply, load(socket)}
   def handle_info(_other, socket), do: {:noreply, socket}
@@ -74,7 +81,11 @@ defmodule ArkabWeb.StatusLive do
     allowed? =
       if event in @local_only, do: socket.assigns.local?, else: socket.assigns.may_change?
 
-    if allowed?, do: change(event, params, socket), else: {:noreply, socket}
+    cond do
+      allowed? -> change(event, params, socket)
+      socket.assigns.may_change? -> {:noreply, socket}
+      true -> {:noreply, locked_out(socket)}
+    end
   end
 
   def handle_event(_event, _params, socket), do: {:noreply, socket}
@@ -173,16 +184,43 @@ defmodule ArkabWeb.StatusLive do
     message =
       case Pin.set(pin) do
         :ok -> {:ok, :pin_saved}
-        {:error, _short} -> {:error, :pin_short}
+        {:error, reason} -> {:error, pin_error_key(reason)}
       end
 
-    {:noreply, socket |> assign(pin_message: message) |> assign_access()}
+    {:noreply, socket |> pin_changed(message) |> assign_access()}
   end
 
-  defp change("pin_remove", _params, socket) do
-    Pin.remove()
-    {:noreply, socket |> assign(pin_message: {:ok, :pin_removed}) |> assign_access()}
+  defp change("pin_new", _params, socket) do
+    message =
+      case Pin.new_random() do
+        {:ok, _pin} -> {:ok, :pin_made}
+        {:error, reason} -> {:error, pin_error_key(reason)}
+      end
+
+    {:noreply, socket |> pin_changed(message) |> assign_access()}
   end
+
+  defp change("pin_notice_ok", _params, socket) do
+    Pin.dismiss_notice()
+    {:noreply, assign(socket, pin_notice?: false)}
+  end
+
+  # A PIN that took puts the one-time notice away too: its news is old.
+  defp pin_changed(socket, {:ok, _key} = message) do
+    Pin.dismiss_notice()
+    assign(socket, pin_message: message, pin_notice?: false)
+  end
+
+  defp pin_changed(socket, message), do: assign(socket, pin_message: message)
+
+  defp pin_error_key(:too_short), do: :pin_short
+  defp pin_error_key(:too_long), do: :pin_long
+  defp pin_error_key(:edge_space), do: :pin_edge
+  defp pin_error_key(:invisible), do: :pin_invisible
+  defp pin_error_key(_unwritable), do: :pin_unwritable
+
+  # Not this machine and no good grant (any more): back to the door.
+  defp locked_out(socket), do: redirect(socket, to: "/unlock")
 
   @impl true
   def handle_async(:check, {:ok, answer}, socket) do
@@ -289,12 +327,10 @@ defmodule ArkabWeb.StatusLive do
   # grant that ran out takes the buttons away from a page that is still open.
   defp assign_access(socket) do
     may_change? = Local.may_change?(socket.assigns.local?, socket.assigns.grant)
-    pin_set? = Pin.set?()
 
     assign(socket,
       may_change?: may_change?,
-      pin_offered?: not may_change? and pin_set?,
-      pin_set?: pin_set?,
+      pin: if(socket.assigns.local?, do: Pin.current()),
       unlocked?: not socket.assigns.local? and Pin.valid_grant?(socket.assigns.grant)
     )
   end
@@ -364,18 +400,6 @@ defmodule ArkabWeb.StatusLive do
 
         <p class="note">{Words.t(@locale, :tagline)}</p>
       </header>
-
-      <section :if={!@may_change?} id="read-only">
-        <h2>{Words.t(@locale, :read_only_title)}</h2>
-
-        <p>{Words.t(@locale, :read_only)}</p>
-
-        <p :if={@pin_offered?}>{Words.t(@locale, :read_only_pin)}</p>
-
-        <p :if={@pin_offered?}>
-          <a id="enter-pin" href="/unlock">{Words.t(@locale, :enter_pin)}</a>
-        </p>
-      </section>
 
       <section :if={@unlocked?} id="unlocked">
         <p class="note">{Words.t(@locale, :unlocked_note)}</p>
@@ -709,10 +733,21 @@ defmodule ArkabWeb.StatusLive do
         <div :if={@local?} id="pin">
           <h3>{Words.t(@locale, :pin_title)}</h3>
 
-          <p class="note">
-            {if @pin_set?,
-              do: Words.t(@locale, :pin_is_set),
-              else: Words.t(@locale, :pin_is_not_set)}
+          <div :if={@pin_notice?} id="pin-notice" class="error">
+            <p>{Words.t(@locale, :pin_notice)}</p>
+
+            <p>
+              <button id="pin-notice-ok" type="button" phx-click="pin_notice_ok">
+                {Words.t(@locale, :pin_notice_ok)}
+              </button>
+            </p>
+          </div>
+
+          <p>
+            {Words.t(@locale, :pin_current)}
+            <strong id="pin-current" class="mono" style="font-size: 1.6em; letter-spacing: 0.05em;">
+              {@pin}
+            </strong>
           </p>
 
           <form id="pin-form" phx-submit="pin_set">
@@ -721,13 +756,27 @@ defmodule ArkabWeb.StatusLive do
               type="password"
               name="pin"
               autocomplete="new-password"
+              autocapitalize="off"
+              spellcheck="false"
+              maxlength={Pin.max_length()}
               placeholder={Words.t(@locale, :pin_new)}
               aria-label={Words.t(@locale, :pin_new)}
-            /> <button id="pin-save" type="submit">{Words.t(@locale, :pin_save)}</button>
-            <button :if={@pin_set?} id="pin-remove" type="button" phx-click="pin_remove">
-              {Words.t(@locale, :pin_remove)}
+            />
+            <button
+              id="pin-input-show"
+              type="button"
+              phx-click={JS.toggle_attribute({"type", "password", "text"}, to: "#pin-input")}
+            >
+              {Words.t(@locale, :pin_show)}
             </button>
+            <button id="pin-save" type="submit">{Words.t(@locale, :pin_save)}</button>
           </form>
+
+          <p>
+            <button id="pin-random" type="button" phx-click="pin_new">
+              {Words.t(@locale, :pin_random)}
+            </button>
+          </p>
 
           <p :if={@pin_message} id="pin-message" class={elem(@pin_message, 0)}>
             {Words.t(@locale, elem(@pin_message, 1))}

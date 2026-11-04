@@ -1,10 +1,12 @@
 defmodule ArkabWeb.PinController do
   @moduledoc """
-  `/unlock`: the remote PIN's door. A right PIN puts a grant into the
-  session cookie (`ArkabWeb.Pin`), which the status page and every change on
-  it check again on the server; `/lock` (a link, since only a request can clear the cookie, and locking
-  one's own browser is not something to forge) takes it out. Plain requests
-  and not LiveView events, because only a request can set a cookie.
+  `/unlock`: the access PIN's door, where every browser that is not this
+  machine is sent (`ArkabWeb.PinGate`). A right PIN puts a grant into the
+  session cookie (`ArkabWeb.Pin`), which every page and every change on it
+  check again on the server; `/lock` (a link, since only a request can clear
+  the cookie, and locking one's own browser is not something to forge) takes
+  it out. Plain requests and not LiveView events, because only a request can
+  set a cookie.
 
   The throttle's key is the socket's peer address, never a header, so a
   guesser cannot change identity by writing one.
@@ -29,10 +31,7 @@ defmodule ArkabWeb.PinController do
         conn |> put_status(403) |> render(:unlock, error: :wrong)
 
       {:error, {:locked, seconds}} ->
-        conn |> put_status(429) |> render(:unlock, error: {:locked, div(seconds + 59, 60)})
-
-      {:error, :none} ->
-        conn |> put_status(403) |> render(:unlock, error: :none)
+        conn |> put_status(429) |> render(:unlock, error: {:locked, seconds})
     end
   end
 

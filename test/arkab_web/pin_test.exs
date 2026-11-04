@@ -1,8 +1,9 @@
 defmodule ArkabWeb.PinTest do
   @moduledoc """
-  The remote PIN: set from the bridge itself, unlocks a browser elsewhere for
-  twelve hours, throttled, void the moment it is changed or removed, and
-  never a way past the rule that only this machine sets it.
+  The access PIN: always there, made at the first start, kept in a file the
+  box can read, shown and changed on the bridge itself only, asked of every
+  other browser before it sees anything, throttled, and every grant void the
+  moment it changes.
   """
 
   use ExUnit.Case, async: false
@@ -17,16 +18,11 @@ defmodule ArkabWeb.PinTest do
 
   setup do
     dir = Path.join(System.tmp_dir!(), "arkab-pin-#{System.unique_integer([:positive])}")
-    Application.put_env(:arkab, :pin_iterations, 1_000)
     start_supervised!({Bridge, data_dir: dir, name: "hall", sources: [], web: true})
     Pin.Throttle.reset()
-
-    on_exit(fn ->
-      Application.delete_env(:arkab, :pin_iterations)
-      File.rm_rf!(dir)
-    end)
-
-    :ok
+    :ok = Pin.set("2468-hall")
+    on_exit(fn -> File.rm_rf!(dir) end)
+    %{dir: dir}
   end
 
   # Who is asking: another computer, a loopback proxy (tailscale serve), or
@@ -56,46 +52,220 @@ defmodule ArkabWeb.PinTest do
   end
 
   describe "the PIN itself" do
-    test "stores a salted hash, never the PIN, and checks it" do
-      refute Pin.set?()
-      assert :ok = Pin.set("2468")
-      assert Pin.set?()
-
-      stored = Bridge.Store.get("remote_pin")
-      refute inspect(stored) =~ "2468"
-      assert byte_size(Base.decode64!(stored["salt"])) == 16
-      assert stored["iter"] == 1_000
-
-      assert {:ok, %{"gen" => gen}} = Pin.attempt("2468", :peer)
-      assert gen == stored["gen"]
-      assert {:error, :wrong} = Pin.attempt("2469", :peer)
+    test "is kept in plaintext in access-pin, one line, and checked", %{dir: dir} do
+      assert File.read!(Path.join(dir, "access-pin")) == "2468-hall\n"
+      assert Pin.current() == "2468-hall"
+      assert {:ok, %{"stamp" => _, "until" => _}} = Pin.attempt("2468-hall", :peer)
+      assert {:error, :wrong} = Pin.attempt("2468-halL", :peer)
     end
 
-    test "at least four characters" do
-      assert {:error, :too_short} = Pin.set("123")
-      refute Pin.set?()
-      assert :ok = Pin.set("1234")
-      assert :ok = Pin.set("a pass phrase is fine too")
+    test "the file is private, and no .new is left behind", %{dir: dir} do
+      refute File.exists?(Path.join(dir, "access-pin.new"))
+
+      unless match?({:win32, _}, :os.type()) do
+        assert File.stat!(Path.join(dir, "access-pin")).mode |> Bitwise.band(0o777) == 0o600
+      end
     end
 
-    test "without a PIN there is nothing to guess" do
-      assert {:error, :none} = Pin.attempt("1234", :peer)
+    test "6 to 64 printable characters, no space at the ends" do
+      assert {:error, :too_short} = Pin.set("12345")
+      assert {:error, :too_long} = Pin.set(String.duplicate("x", 65))
+      assert {:error, :edge_space} = Pin.set(" 123456")
+      assert {:error, :edge_space} = Pin.set("123456 ")
+      assert {:error, :invisible} = Pin.set("123\t456")
+      assert {:error, :invisible} = Pin.set("123" <> <<0x85::utf8>> <> "456")
+      assert {:error, :invisible} = Pin.set(<<0xFF, 0xFE, "123456">>)
+      assert Pin.current() == "2468-hall"
+
+      assert :ok = Pin.set("123456")
+      assert :ok = Pin.set(String.duplicate("é", 64))
+      assert :ok = Pin.set("a pass phrase, with spaces & signs")
+      assert Pin.current() == "a pass phrase, with spaces & signs"
     end
 
-    test "five wrong tries lock a peer out, even for the right PIN; another peer is untouched" do
-      Pin.set("2468")
-      for _ <- 1..5, do: assert({:error, :wrong} = Pin.attempt("0000", :peer))
-      assert {:error, {:locked, seconds}} = Pin.attempt("2468", :peer)
-      assert seconds in 299..300
-      assert {:ok, _grant} = Pin.attempt("2468", :other)
+    test "there is no way to remove it" do
+      refute function_exported?(Pin, :remove, 0)
+      assert {:error, :too_short} = Pin.set("")
+      assert Pin.current() == "2468-hall"
+    end
+
+    test "a new random PIN is six digits, and replaces the old one", %{dir: dir} do
+      assert {:ok, pin} = Pin.new_random()
+      assert pin =~ ~r/\A\d{6}\z/
+      assert Pin.current() == pin
+      assert File.read!(Path.join(dir, "access-pin")) == pin <> "\n"
+      assert Enum.all?(1..200, fn _ -> Pin.random_digits() =~ ~r/\A\d{6}\z/ end)
+    end
+
+    test "changing the PIN, or a new random one, voids every grant" do
+      {:ok, grant} = Pin.attempt("2468-hall", :peer)
+      assert Pin.valid_grant?(grant)
+
+      :ok = Pin.set("1357-hall")
+      refute Pin.valid_grant?(grant)
+
+      {:ok, grant} = Pin.attempt("1357-hall", :peer)
+      assert Pin.valid_grant?(grant)
+      {:ok, _pin} = Pin.new_random()
+      refute Pin.valid_grant?(grant)
+    end
+
+    test "a grant holds a stamp of the PIN, not the PIN" do
+      {:ok, grant} = Pin.attempt("2468-hall", :peer)
+      refute inspect(grant) =~ "2468"
+      assert byte_size(Base.decode64!(grant["stamp"])) == 16
+    end
+
+    test "an expired or forged grant is no grant" do
+      {:ok, %{"stamp" => stamp}} = Pin.attempt("2468-hall", :peer)
+      now = System.os_time(:second)
+      refute Pin.valid_grant?(%{"stamp" => stamp, "until" => now - 1})
+      refute Pin.valid_grant?(%{"stamp" => stamp, "until" => now + 10 * 24 * 3600})
+      refute Pin.valid_grant?(%{"stamp" => "AAAAAAAAAAAAAAAAAAAAAA==", "until" => now + 60})
+      refute Pin.valid_grant?(%{"gen" => 1, "until" => now + 60})
+      refute Pin.valid_grant?(nil)
+    end
+
+    test "may_change? is local, or a good grant" do
+      {:ok, grant} = Pin.attempt("2468-hall", :peer)
+      assert Local.may_change?(true, nil)
+      assert Local.may_change?(false, grant)
+      refute Local.may_change?(false, nil)
+    end
+  end
+
+  describe "first start" do
+    test "makes a six-digit PIN, and a restart keeps it" do
+      dir = Path.join(System.tmp_dir!(), "arkab-pin-first-#{System.unique_integer([:positive])}")
+      on_exit(fn -> File.rm_rf!(dir) end)
+      stop_supervised!(Bridge)
+
+      start_supervised!({Bridge, data_dir: dir, name: "hall", sources: [], web: true})
+      pin = Pin.current()
+      assert pin =~ ~r/\A\d{6}\z/
+      assert File.read!(Path.join(dir, "access-pin")) == pin <> "\n"
+      refute Pin.notice?(), "nothing was retired, so nothing to say"
+
+      stop_supervised!(Bridge)
+      start_supervised!({Bridge, data_dir: dir, name: "hall", sources: [], web: true})
+      assert Pin.current() == pin
+    end
+
+    test "an old PIN hash is retired, a new PIN made, and the page says so once" do
+      dir = Path.join(System.tmp_dir!(), "arkab-pin-old-#{System.unique_integer([:positive])}")
+      on_exit(fn -> File.rm_rf!(dir) end)
+      stop_supervised!(Bridge)
+
+      # The old version's bridge, with a hashed remote PIN.
+      start_supervised!({Bridge, data_dir: dir, name: "hall", sources: [], web: false})
+
+      Bridge.Store.put("remote_pin", %{
+        "gen" => 3,
+        "iter" => 1000,
+        "salt" => "c2FsdA==",
+        "hash" => "aGFzaA=="
+      })
+
+      stop_supervised!(Bridge)
+
+      start_supervised!({Bridge, data_dir: dir, name: "hall", sources: [], web: true})
+      assert Bridge.Store.get("remote_pin") == nil
+      assert Pin.current() =~ ~r/\A\d{6}\z/
+      assert Pin.notice?()
+
+      {:ok, view, _html} = live(build_conn(), "/")
+      assert has_element?(view, "#pin-notice")
+      view |> element("#pin-notice-ok") |> render_click()
+      refute has_element?(view, "#pin-notice")
+      refute Pin.notice?()
+    end
+
+    test "a file that is a symlink is not the PIN" do
+      dir = Path.join(System.tmp_dir!(), "arkab-pin-link-#{System.unique_integer([:positive])}")
+      on_exit(fn -> File.rm_rf!(dir) end)
+      stop_supervised!(Bridge)
+      File.mkdir_p!(dir)
+      target = Path.join(dir, "elsewhere")
+      File.write!(target, "sneaky-pin\n")
+
+      case File.ln_s(target, Path.join(dir, "access-pin")) do
+        :ok ->
+          start_supervised!({Bridge, data_dir: dir, name: "hall", sources: [], web: true})
+          assert Pin.current() =~ ~r/\A\d{6}\z/
+          assert File.read!(target) == "sneaky-pin\n", "the link's target was not written"
+          assert {:ok, %File.Stat{type: :regular}} = File.lstat(Path.join(dir, "access-pin"))
+
+        {:error, _no_symlinks_here} ->
+          :ok
+      end
+    end
+  end
+
+  describe "the lockout" do
+    alias ArkabWeb.Pin.Throttle
+
+    test "five free failures, then 5 s, doubling, capped at 15 minutes" do
+      for _ <- 1..4, do: assert(:ok = Throttle.claim(:a, 1000))
+      # The fifth guess is still heard; it starts the wait.
+      assert :ok = Throttle.claim(:a, 1000)
+      assert {:locked, 5} = Throttle.claim(:a, 1000)
+      assert {:locked, 1} = Throttle.claim(:a, 1004)
+      assert :ok = Throttle.claim(:a, 1005)
+      assert {:locked, 10} = Throttle.claim(:a, 1005)
+      assert :ok = Throttle.claim(:a, 1015)
+      assert {:locked, 20} = Throttle.claim(:a, 1015)
+
+      # Far enough along, the wait stops growing at 900 s.
+      t =
+        Enum.reduce(1..10, 1035, fn _, t ->
+          :ok = Throttle.claim(:a, t)
+          {:locked, wait} = Throttle.claim(:a, t)
+          assert wait <= 900
+          t + wait
+        end)
+
+      :ok = Throttle.claim(:a, t)
+      assert {:locked, 900} = Throttle.claim(:a, t)
+    end
+
+    test "while an address waits, even the right PIN is refused; another address is not" do
+      for _ <- 1..5, do: assert({:error, :wrong} = Pin.attempt("000000", :peer))
+      assert {:error, {:locked, seconds}} = Pin.attempt("2468-hall", :peer)
+      assert seconds in 1..5
+      assert {:ok, _grant} = Pin.attempt("2468-hall", :other)
+    end
+
+    test "a right PIN clears the count" do
+      for _ <- 1..4, do: Pin.attempt("000000", :peer)
+      assert {:ok, _} = Pin.attempt("2468-hall", :peer)
+      for _ <- 1..4, do: Pin.attempt("000000", :peer)
+      assert {:ok, _} = Pin.attempt("2468-hall", :peer)
+    end
+
+    test "box-wide, 40 failures a minute; then everybody waits, the right PIN too" do
+      for n <- 1..40, do: assert(:ok = Throttle.claim({:addr, n}, 2000 + rem(n, 10)))
+      assert {:locked, 51} = Throttle.claim(:fresh, 2009)
+      assert {:locked, 1} = Throttle.claim(:fresh, 2059)
+      assert :ok = Throttle.claim(:fresh, 2060)
+    end
+
+    test "a right PIN's own claim is no failure for the box-wide count" do
+      for n <- 1..60, do: assert({:ok, _} = Pin.attempt("2468-hall", {:addr, n}))
+    end
+
+    test "an address quiet for an hour is forgotten" do
+      for _ <- 1..5, do: :ok = Throttle.claim(:a, 0)
+      assert {:locked, 5} = Throttle.claim(:a, 0)
+      # One failure more after an hour and a bit: counted as the first again.
+      for _ <- 1..4, do: assert(:ok = Throttle.claim(:a, 3_700))
+      assert :ok = Throttle.claim(:a, 3_700)
+      assert {:locked, 5} = Throttle.claim(:a, 3_700)
     end
 
     test "fifty guesses at once still get five tries between them" do
-      Pin.set("2468")
-
       answers =
         1..50
-        |> Task.async_stream(fn _ -> Pin.attempt("0000", :peer) end, max_concurrency: 50)
+        |> Task.async_stream(fn _ -> Pin.attempt("000000", :peer) end, max_concurrency: 50)
         |> Enum.map(fn {:ok, answer} -> answer end)
 
       assert Enum.count(answers, &(&1 == {:error, :wrong})) == 5
@@ -105,179 +275,109 @@ defmodule ArkabWeb.PinTest do
                &match?({:error, {:locked, _}}, &1)
              )
     end
-
-    test "a right PIN clears the count" do
-      Pin.set("2468")
-      for _ <- 1..4, do: Pin.attempt("0000", :peer)
-      assert {:ok, _} = Pin.attempt("2468", :peer)
-      for _ <- 1..4, do: Pin.attempt("0000", :peer)
-      assert {:ok, _} = Pin.attempt("2468", :peer)
-    end
-
-    test "changing or removing the PIN voids every grant" do
-      Pin.set("2468")
-      {:ok, grant} = Pin.attempt("2468", :peer)
-      assert Pin.valid_grant?(grant)
-
-      Pin.set("1357")
-      refute Pin.valid_grant?(grant)
-
-      {:ok, grant} = Pin.attempt("1357", :peer)
-      assert Pin.valid_grant?(grant)
-      Pin.remove()
-      refute Pin.valid_grant?(grant)
-      refute Pin.set?()
-
-      Pin.set("1357")
-      refute Pin.valid_grant?(grant)
-    end
-
-    test "an expired or forged grant is no grant" do
-      Pin.set("2468")
-      {:ok, %{"gen" => gen}} = Pin.attempt("2468", :peer)
-      now = System.os_time(:second)
-      refute Pin.valid_grant?(%{"gen" => gen, "until" => now - 1})
-      refute Pin.valid_grant?(%{"gen" => gen, "until" => now + 10 * 24 * 3600})
-      refute Pin.valid_grant?(%{"gen" => gen + 1, "until" => now + 60})
-      refute Pin.valid_grant?(%{"admin" => true})
-      refute Pin.valid_grant?(nil)
-    end
-
-    test "may_change? is local, or a good grant" do
-      Pin.set("2468")
-      {:ok, grant} = Pin.attempt("2468", :peer)
-      assert Local.may_change?(true, nil)
-      assert Local.may_change?(false, grant)
-      refute Local.may_change?(false, nil)
-      refute Local.may_change?(false, %{"gen" => 99, "until" => System.os_time(:second) + 5})
-    end
   end
 
   describe "from another computer" do
-    test "without a PIN, read-only stays read-only and offers no door" do
-      {:ok, view, _html} = live(as(build_conn(), :lan), "/")
-      assert has_element?(view, "#read-only")
-      refute has_element?(view, "#enter-pin")
-      refute has_element?(view, "#pin")
-      refute has_element?(view, "#join-form")
+    test "every page sends it to the unlock page first" do
+      conn = build_conn() |> as(:lan) |> get("/")
+      assert redirected_to(conn) == "/unlock"
+      conn = build_conn() |> as(:lan) |> get("/help")
+      assert redirected_to(conn) == "/unlock"
 
-      conn = unlock(:lan, "2468")
-      assert html_response(conn, 403) =~ "no remote PIN"
+      assert {:error, {:redirect, %{to: "/unlock"}}} = live(as(build_conn(), :lan), "/")
     end
 
-    test "with a PIN, the banner offers Enter PIN, and the page is still read-only" do
-      Pin.set("2468")
-      {:ok, view, _html} = live(as(build_conn(), :lan), "/")
-      assert has_element?(view, "#read-only #enter-pin")
-      refute has_element?(view, "#join-form")
-      refute has_element?(view, "#pin")
+    test "the unlock page has a masked text field with a Show button, not a keypad" do
+      conn = build_conn() |> as(:lan) |> get("/unlock")
+      doc = conn |> html_response(200) |> LazyHTML.from_document()
+
+      field = LazyHTML.query(doc, "#unlock-form input#pin")
+      assert LazyHTML.attribute(field, "type") == ["password"]
+      assert LazyHTML.attribute(field, "maxlength") == ["64"]
+      assert LazyHTML.attribute(field, "inputmode") == []
+      assert LazyHTML.attribute(LazyHTML.query(doc, "#pin-show"), "data-reveal") == ["pin"]
     end
 
     test "a wrong PIN is refused and gives nothing" do
-      Pin.set("2468")
-      conn = unlock(:lan, "1111")
+      conn = unlock(:lan, "111111")
       assert html_response(conn, 403) =~ "not the PIN"
-      {:ok, view, _html} = open(conn, :lan)
-      assert has_element?(view, "#read-only")
-      refute has_element?(view, "#join-form")
+      assert {:error, {:redirect, %{to: "/unlock"}}} = open(conn, :lan)
     end
 
-    test "the right PIN gives the controls, and an event then works" do
+    test "the right PIN gives the page and its controls, but not the PIN" do
       id = joined_server()
-      Pin.set("2468")
 
-      conn = unlock(:lan, "2468")
+      conn = unlock(:lan, "2468-hall")
       assert redirected_to(conn) == "/"
 
-      {:ok, view, _html} = open(conn, :lan)
-      refute has_element?(view, "#read-only")
+      {:ok, view, html} = open(conn, :lan)
       assert has_element?(view, "#unlocked")
       assert has_element?(view, "#join-form")
       assert has_element?(view, "#remove-#{id}")
-      refute has_element?(view, "#pin"), "the PIN is managed from the bridge only"
+      refute has_element?(view, "#pin"), "the PIN is shown and changed on the bridge only"
+      refute html =~ "2468-hall"
 
       render_click(view, "remove", %{"id" => to_string(id)})
       assert Bridge.Store.servers() == []
     end
 
     test "locking again takes the grant away" do
-      Pin.set("2468")
-      conn = unlock(:lan, "2468")
+      conn = unlock(:lan, "2468-hall")
       conn = conn |> recycle() |> as(:lan) |> get("/lock")
       assert redirected_to(conn) == "/"
-      {:ok, view, _html} = open(conn, :lan)
-      assert has_element?(view, "#read-only")
+      assert {:error, {:redirect, %{to: "/unlock"}}} = open(conn, :lan)
     end
 
-    test "events sent by hand are refused without a grant" do
-      id = joined_server()
-      Pin.set("2468")
-      {:ok, view, _html} = live(as(build_conn(), :lan), "/")
-
-      render_click(view, "remove", %{"id" => to_string(id)})
-      render_click(view, "update_check", %{"on" => "false"})
-      render_submit(view, "pin_set", %{"pin" => "9999"})
-      render_click(view, "pin_remove", %{})
-
-      assert [%{id: ^id}] = Bridge.Store.servers()
-      assert Bridge.Store.get("update_check") == nil
-      assert {:ok, _} = Pin.attempt("2468", :peer), "the PIN was not touched"
-    end
-
-    test "a grant does not let a browser set, change or remove the PIN" do
-      Pin.set("2468")
-      conn = unlock(:lan, "2468")
+    test "a grant does not let a browser change the PIN" do
+      conn = unlock(:lan, "2468-hall")
       {:ok, view, _html} = open(conn, :lan)
 
-      render_submit(view, "pin_set", %{"pin" => "9999"})
-      render_click(view, "pin_remove", %{})
+      render_submit(view, "pin_set", %{"pin" => "999999"})
+      render_click(view, "pin_new", %{})
 
-      assert Pin.set?()
-      assert {:ok, _} = Pin.attempt("2468", :peer)
-      assert {:error, :wrong} = Pin.attempt("9999", :peer)
+      assert Pin.current() == "2468-hall"
     end
 
-    test "changing the PIN locks an open page at its next event" do
+    test "changing the PIN sends an open page back to the door" do
       id = joined_server()
-      Pin.set("2468")
-      conn = unlock(:lan, "2468")
+      conn = unlock(:lan, "2468-hall")
       {:ok, view, _html} = open(conn, :lan)
       assert has_element?(view, "#join-form")
 
-      Pin.set("1357")
+      :ok = Pin.set("1357-hall")
       render_click(view, "remove", %{"id" => to_string(id)})
 
       assert [%{id: ^id}] = Bridge.Store.servers()
-      refute has_element?(view, "#join-form")
-      assert has_element?(view, "#read-only")
+      assert_redirect(view, "/unlock")
     end
 
-    test "removing the PIN locks the grant out too" do
-      Pin.set("2468")
-      conn = unlock(:lan, "2468")
-      Pin.remove()
+    test "and the next tick does the same for a page that does nothing" do
+      conn = unlock(:lan, "2468-hall")
       {:ok, view, _html} = open(conn, :lan)
-      assert has_element?(view, "#read-only")
-      refute has_element?(view, "#join-form")
+      {:ok, _pin} = Pin.new_random()
+      send(view.pid, :refresh)
+      assert_redirect(view, "/unlock")
     end
 
-    test "five wrong tries in the page lock the address out, the right PIN too" do
-      Pin.set("2468")
-      for _ <- 1..5, do: unlock(:lan, "0000")
-      conn = unlock(:lan, "2468")
-      assert html_response(conn, 429) =~ "Too many wrong tries"
-      {:ok, view, _html} = open(conn, :lan)
-      assert has_element?(view, "#read-only")
+    test "an old grant opens nothing after a change" do
+      conn = unlock(:lan, "2468-hall")
+      :ok = Pin.set("1357-hall")
+      assert {:error, {:redirect, %{to: "/unlock"}}} = open(conn, :lan)
+    end
+
+    test "five wrong tries in the page make the address wait, the right PIN too" do
+      for _ <- 1..5, do: unlock(:lan, "000000")
+      conn = unlock(:lan, "2468-hall")
+      assert html_response(conn, 429) =~ ~r/Wait \d seconds/
+      assert {:error, {:redirect, %{to: "/unlock"}}} = open(conn, :lan)
     end
 
     test "a post without the CSRF token is refused" do
-      Pin.set("2468")
-
       assert_error_sent 403, fn ->
         build_conn()
         |> Plug.Conn.put_private(:plug_skip_csrf_protection, false)
         |> as(:lan)
-        |> post("/unlock", %{"pin" => "2468"})
+        |> post("/unlock", %{"pin" => "2468-hall"})
       end
     end
   end
@@ -285,14 +385,10 @@ defmodule ArkabWeb.PinTest do
   describe "behind a proxy on loopback" do
     test "is not this machine, but can unlock with the PIN" do
       id = joined_server()
-      Pin.set("2468")
 
-      {:ok, view, _html} = live(as(build_conn(), :proxied), "/")
-      assert has_element?(view, "#read-only #enter-pin")
-      refute has_element?(view, "#join-form")
-      refute has_element?(view, "#pin")
+      assert {:error, {:redirect, %{to: "/unlock"}}} = live(as(build_conn(), :proxied), "/")
 
-      conn = unlock(:proxied, "2468")
+      conn = unlock(:proxied, "2468-hall")
       assert redirected_to(conn) == "/"
       {:ok, view, _html} = open(conn, :proxied)
       assert has_element?(view, "#remove-#{id}")
@@ -301,29 +397,42 @@ defmodule ArkabWeb.PinTest do
   end
 
   describe "this machine" do
-    test "manages the PIN from the page" do
-      {:ok, view, _html} = live(build_conn(), "/")
-      assert has_element?(view, "#pin")
-      refute has_element?(view, "#pin-remove")
-
-      view |> form("#pin-form", %{pin: "12"}) |> render_submit()
-      assert has_element?(view, "#pin-message.error")
-      refute Pin.set?()
-
-      view |> form("#pin-form", %{pin: "2468"}) |> render_submit()
-      assert has_element?(view, "#pin-message.ok")
-      assert Pin.set?()
-      assert has_element?(view, "#pin-remove")
-
-      view |> element("#pin-remove") |> render_click()
-      refute Pin.set?()
+    test "is never asked for the PIN" do
+      conn = get(build_conn(), "/")
+      assert html_response(conn, 200)
+      assert {:ok, view, _html} = live(build_conn(), "/")
+      refute has_element?(view, "#unlocked")
     end
 
-    test "never sees the Enter PIN door, with or without a PIN" do
-      Pin.set("2468")
+    test "sees the PIN and changes it, with a Show toggle and no Remove", %{dir: dir} do
       {:ok, view, _html} = live(build_conn(), "/")
-      refute has_element?(view, "#read-only")
-      refute has_element?(view, "#enter-pin")
+      assert has_element?(view, "#pin-current", "2468-hall")
+      assert has_element?(view, "#pin-input[type=password]")
+      assert has_element?(view, "#pin-input-show")
+      refute has_element?(view, "#pin-remove")
+      refute render(view) =~ ~r/remove pin/i
+
+      view |> form("#pin-form", %{pin: "12345"}) |> render_submit()
+      assert has_element?(view, "#pin-message.error", "at least 6")
+      assert Pin.current() == "2468-hall"
+
+      view |> form("#pin-form", %{pin: " 123456"}) |> render_submit()
+      assert has_element?(view, "#pin-message.error", "space")
+
+      view |> form("#pin-form", %{pin: "new hall pin"}) |> render_submit()
+      assert has_element?(view, "#pin-message.ok")
+      assert Pin.current() == "new hall pin"
+      assert File.read!(Path.join(dir, "access-pin")) == "new hall pin\n"
+      assert has_element?(view, "#pin-current", "new hall pin")
+    end
+
+    test "makes a new random PIN with one button" do
+      {:ok, view, _html} = live(build_conn(), "/")
+      view |> element("#pin-random") |> render_click()
+      pin = Pin.current()
+      assert pin =~ ~r/\A\d{6}\z/
+      assert has_element?(view, "#pin-current", pin)
+      assert has_element?(view, "#pin-message.ok")
     end
   end
 end

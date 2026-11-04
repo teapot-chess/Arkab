@@ -4,6 +4,7 @@ Config.CSWH: Cross-Site Websocket Hijacking,lib/arkab_web/endpoint.ex:18,23FA466
 Config.HTTPS: HTTPS Not Enabled,config/prod.exs:0,2B5C077
 Traversal.FileModule: Directory Traversal in `File.chmod`,lib/arkab/launcher_details.ex:155,55344D6
 Traversal.FileModule: Directory Traversal in `File.chmod`,lib/arkab/launcher_details.ex:160,781955B
+Traversal.FileModule: Directory Traversal in `File.chmod`,lib/arkab_web/pin.ex:231,5B59D0D
 Traversal.FileModule: Directory Traversal in `File.mkdir_p!`,lib/arkab/bridge.ex:33,44B9B9
 Traversal.FileModule: Directory Traversal in `File.mkdir_p!`,lib/arkab/bridge/store.ex:152,20EF87A
 Traversal.FileModule: Directory Traversal in `File.mkdir_p!`,lib/arkab/recorder.ex:123,765B589
@@ -11,15 +12,22 @@ Traversal.FileModule: Directory Traversal in `File.mkdir_p`,lib/arkab/launcher_d
 Traversal.FileModule: Directory Traversal in `File.mkdir_p`,lib/arkab/updates.ex:363,17C6A55
 Traversal.FileModule: Directory Traversal in `File.open`,lib/arkab/launcher_details/cli.ex:223,384B8B1
 Traversal.FileModule: Directory Traversal in `File.open`,lib/arkab/recorder.ex:126,5540A3C
+Traversal.FileModule: Directory Traversal in `File.open`,lib/arkab_web/pin.ex:230,7EBA066
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/capture.ex:63,2940F15
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/launcher_details/cli.ex:265,4413F15
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/pin_request.ex:59,3AD70FD
+Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/pin_request.ex:66,11C0BBD
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/updates.ex:384,EBBAE1
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab_web/endpoint.ex:67,29757F3
+Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab_web/pin.ex:248,3C627E5
 Traversal.FileModule: Directory Traversal in `File.rm`,lib/arkab/launcher_details.ex:131,588A32
 Traversal.FileModule: Directory Traversal in `File.rm`,lib/arkab/pin_request.ex:60,32BD559
 Traversal.FileModule: Directory Traversal in `File.rm`,lib/arkab/pin_request.ex:65,735FD66
+Traversal.FileModule: Directory Traversal in `File.rm`,lib/arkab/pin_request.ex:67,467834F
+Traversal.FileModule: Directory Traversal in `File.rm`,lib/arkab/pin_request.ex:72,68DF823
 Traversal.FileModule: Directory Traversal in `File.rm`,lib/arkab/recorder.ex:149,2FEA606
+Traversal.FileModule: Directory Traversal in `File.rm`,lib/arkab_web/pin.ex:228,47E0D75
+Traversal.FileModule: Directory Traversal in `File.rm`,lib/arkab_web/pin.ex:238,36E903E
 Traversal.FileModule: Directory Traversal in `File.write!`,lib/arkab_web/endpoint.ex:73,231F395
 Traversal.FileModule: Directory Traversal in `File.write`,lib/arkab/launcher_details.ex:159,7944FD6
 Traversal.FileModule: Directory Traversal in `File.write`,lib/arkab/launcher_details.ex:161,6C7610

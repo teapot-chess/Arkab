@@ -76,69 +76,43 @@ defmodule ArkabWeb.StatusLiveTest do
   end
 
   describe "from another machine on the network" do
-    defp lan(address \\ {192, 168, 1, 23}) do
-      Plug.Test.put_peer_data(build_conn(), %{address: address, port: 50_000, ssl_cert: nil})
+    defp lan do
+      Plug.Test.put_peer_data(build_conn(), %{
+        address: {192, 168, 1, 23},
+        port: 50_000,
+        ssl_cert: nil
+      })
     end
 
-    test "the page is a read-only view: the servers show, no control is drawn" do
+    test "the page is not shown at all: the door comes first" do
       server = FakeServer.start(codes: ["P"])
       {:ok, _id} = Bridge.join(FakeServer.link(server, "P"))
-      [%{id: id}] = Arkab.Bridge.Store.servers()
 
-      {:ok, view, html} = live(lan(), "/")
-
-      assert has_element?(view, "#read-only")
-      assert html =~ "Read-only view"
-      assert has_element?(view, "#server-#{id}")
-      refute has_element?(view, "#remove-#{id}")
-      refute has_element?(view, "#join-form")
-      refute has_element?(view, "#check-now")
-      refute has_element?(view, "#update-check")
+      assert redirected_to(get(lan(), "/")) == "/unlock"
+      assert {:error, {:redirect, %{to: "/unlock"}}} = live(lan(), "/")
     end
 
-    test "it says so in Dutch too" do
+    test "the door speaks Dutch too" do
       conn =
         lan()
         |> get("/lang/nl")
         |> recycle()
         |> Plug.Test.put_peer_data(%{address: {10, 0, 0, 4}, port: 1, ssl_cert: nil})
+        |> get("/unlock")
 
-      {:ok, view, _html} = live(conn, "/")
-      assert has_element?(view, "#read-only", "Alleen-lezen")
-    end
-
-    test "an event sent by hand changes nothing" do
-      server = FakeServer.start(codes: ["P"])
-      {:ok, _id} = Bridge.join(FakeServer.link(server, "P"))
-      [%{id: id}] = Arkab.Bridge.Store.servers()
-      other = FakeServer.start(codes: ["Q"])
-
-      {:ok, view, _html} = live(lan(), "/")
-
-      render_hook(view, "remove", %{"id" => to_string(id)})
-      assert [%{id: ^id}] = Arkab.Bridge.Store.servers()
-
-      render_hook(view, "join", %{"link" => FakeServer.link(other, "Q")})
-      assert length(Arkab.Bridge.Store.servers()) == 1
-
-      render_hook(view, "update", %{})
-      render_hook(view, "autostart", %{"on" => "true"})
-      assert Process.alive?(view.pid)
+      assert html_response(conn, 200) =~ "Deze brug ontgrendelen"
     end
 
     test "a loopback peer behind a proxy header is not this machine" do
       conn = build_conn() |> Plug.Conn.put_req_header("x-forwarded-for", "203.0.113.9")
-      {:ok, view, _html} = live(conn, "/")
-      assert has_element?(view, "#read-only")
+      assert {:error, {:redirect, %{to: "/unlock"}}} = live(conn, "/")
     end
 
     # The socket only sees `x-` headers; these two it would never see.
     for header <- ["forwarded", "cf-connecting-ip"] do
       test "a loopback peer behind a `#{header}` header is not this machine" do
         conn = build_conn() |> Plug.Conn.put_req_header(unquote(header), "for=203.0.113.9")
-        {:ok, view, _html} = live(conn, "/")
-        assert has_element?(view, "#read-only")
-        refute has_element?(view, "#join-form")
+        assert {:error, {:redirect, %{to: "/unlock"}}} = live(conn, "/")
       end
     end
 
@@ -154,9 +128,9 @@ defmodule ArkabWeb.StatusLiveTest do
       refute ArkabWeb.Local.local_socket?(no_view, %{"arkab_local" => true})
     end
 
-    test "this machine gets the controls" do
+    test "this machine gets the page and the controls" do
       {:ok, view, _html} = live(build_conn(), "/")
-      refute has_element?(view, "#read-only")
+      refute has_element?(view, "#unlocked")
       assert has_element?(view, "#join-form")
     end
   end

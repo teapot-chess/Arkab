@@ -12,14 +12,24 @@ defmodule ArkabWeb.Router do
     plug ArkabWeb.Local
   end
 
+  pipeline :pin do
+    plug ArkabWeb.PinGate
+  end
+
   scope "/", ArkabWeb do
     pipe_through :browser
     get "/lang/:code", LangController, :set
     get "/unlock", PinController, :show
     post "/unlock", PinController, :unlock
     get "/lock", PinController, :lock
+  end
 
-    live_session :default, on_mount: {ArkabWeb.Locale, :default} do
+  # Every page behind the access PIN: this machine, or a browser that gave it.
+  scope "/", ArkabWeb do
+    pipe_through [:browser, :pin]
+
+    live_session :default,
+      on_mount: [{ArkabWeb.Locale, :default}, {ArkabWeb.PinGate, :default}] do
       live "/", StatusLive, :index
       live "/help", HelpLive, :index
     end

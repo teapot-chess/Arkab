@@ -15,9 +15,6 @@ defmodule ArkabWeb.Words do
   @words %{
     "en" => %{
       tagline: "Reads the boards in this hall and sends them on.",
-      read_only_title: "Read-only view",
-      read_only:
-        "You are looking at this bridge from another computer, so you can see everything and change nothing. To join or leave a server, or to update, open this page on the bridge itself, or from your own computer through an SSH port forward (ssh -L 4050:localhost:4050 <the bridge>, then http://localhost:4050).",
       servers: "Servers",
       connected: "connected",
       not_connected: "not connected",
@@ -65,22 +62,20 @@ defmodule ArkabWeb.Words do
       update_no_build: "There is no build for this machine.",
       update_failed: "The last update, to %{version}, did not work: %{why}",
       program_title: "This program",
-      read_only_pin:
-        "If the bridge has a remote PIN, you can unlock this page with it: it then works like the bridge itself for 12 hours, on this browser.",
-      enter_pin: "Enter PIN",
       unlock_title: "Unlock this bridge",
       unlock_intro:
-        "Enter the bridge's remote PIN. This browser then gets every button for 12 hours.",
+        "Enter the bridge's access PIN. This browser then gets the page, every button included, for 12 hours.",
+      unlock_where:
+        "The PIN is on the status page of the bridge itself, and on the screen of a box that has one.",
+      pin_show: "Show",
       pin_label: "PIN",
       unlock: "Unlock",
       lock_again: "Lock again",
       unlocked_note: "Unlocked with the PIN, for 12 hours at most.",
       pin_wrong: "That is not the PIN.",
-      pin_locked: "Too many wrong tries. Try again in %{minutes} minutes.",
-      pin_none:
-        "This bridge has no remote PIN, so it can only be changed from the bridge itself.",
+      pin_locked: "Too many wrong tries. Wait %{seconds} seconds.",
       pin_plain:
-        "The page runs on plain HTTP: the PIN crosses the hall's network in clear. It keeps a curious guest out of the buttons; it is not security against the internet.",
+        "The page runs on plain HTTP: the PIN crosses the hall's network in clear. It keeps a curious guest out of the page; it is not security against the internet.",
       help_title: "Get help",
       help_hint:
         "Sends this box's report (passwords and keys left out) to the people who help, and gives a code to read out to them.",
@@ -134,17 +129,23 @@ defmodule ArkabWeb.Words do
       switch_yes: "Yes, switch to master",
       switch_started: "Switching. The box restarts.",
       switch_failed: "The box did not switch. Try again, or use Settings in its menu.",
-      pin_title: "Remote PIN",
-      pin_is_set: "A remote PIN is set.",
-      pin_is_not_set: "No remote PIN: from another computer this page is read-only.",
-      pin_new: "New PIN (at least 4 characters)",
+      pin_title: "Access PIN",
+      pin_current: "The PIN:",
+      pin_random: "New random PIN",
+      pin_made: "A new PIN was made; every other browser has to give the new one.",
+      pin_notice:
+        "A new PIN was made when Arkab was updated: the old one was stored only as a hash and could not be shown.",
+      pin_notice_ok: "Got it",
+      pin_long: "A PIN has 64 characters at most.",
+      pin_edge: "A PIN cannot start or end with a space.",
+      pin_invisible: "A PIN cannot hold an invisible or control character.",
+      pin_unwritable: "The PIN could not be written to disk; the old one stays.",
+      pin_new: "New PIN (at least 6 characters)",
       pin_save: "Save PIN",
-      pin_remove: "Remove PIN",
-      pin_saved: "PIN saved. Browsers that were unlocked are locked again.",
-      pin_removed: "PIN removed. Browsers that were unlocked are locked again.",
-      pin_short: "A PIN needs at least 4 characters.",
+      pin_saved: "PIN changed; every other browser has to give the new one.",
+      pin_short: "A PIN needs at least 6 characters.",
       pin_hint:
-        "With a PIN, a phone or laptop on the hall's network can unlock this page. Setting, changing or removing the PIN works on the bridge itself only.",
+        "Every other computer, phone or laptop has to give this PIN before it sees this page. It is shown and changed on the bridge itself only, and there is always one.",
       version: "Version",
       update_check: "Look for a newer version now and then",
       check_now: "Look now",
@@ -156,9 +157,6 @@ defmodule ArkabWeb.Words do
     },
     "nl" => %{
       tagline: "Leest de borden in deze zaal en stuurt ze door.",
-      read_only_title: "Alleen-lezen weergave",
-      read_only:
-        "Je kijkt vanaf een andere computer naar deze brug: je ziet alles, maar kunt niets wijzigen. Om aan te sluiten bij een server, een server te verlaten of bij te werken open je deze pagina op de brug zelf, of vanaf je eigen computer via een SSH-poortdoorverwijzing (ssh -L 4050:localhost:4050 <de brug>, daarna http://localhost:4050).",
       servers: "Servers",
       connected: "verbonden",
       not_connected: "niet verbonden",
@@ -207,22 +205,20 @@ defmodule ArkabWeb.Words do
       update_no_build: "Voor deze machine bestaat geen versie.",
       update_failed: "De laatste update, naar %{version}, is mislukt: %{why}",
       program_title: "Dit programma",
-      read_only_pin:
-        "Heeft de brug een pincode voor op afstand, dan kun je deze pagina daarmee ontgrendelen: ze werkt dan 12 uur lang, in deze browser, als de brug zelf.",
-      enter_pin: "Pincode invoeren",
       unlock_title: "Deze brug ontgrendelen",
       unlock_intro:
-        "Voer de pincode van de brug in. Deze browser krijgt dan 12 uur lang alle knoppen.",
+        "Voer de pincode van de brug in. Deze browser krijgt dan 12 uur lang de pagina, met alle knoppen.",
+      unlock_where:
+        "De pincode staat op de statuspagina van de brug zelf, en op het scherm van een box die er een heeft.",
+      pin_show: "Tonen",
       pin_label: "Pincode",
       unlock: "Ontgrendelen",
       lock_again: "Weer vergrendelen",
       unlocked_note: "Ontgrendeld met de pincode, hooguit 12 uur.",
       pin_wrong: "Dat is de pincode niet.",
-      pin_locked: "Te veel foute pogingen. Probeer het over %{minutes} minuten opnieuw.",
-      pin_none:
-        "Deze brug heeft geen pincode voor op afstand, dus je kunt hem alleen vanaf de brug zelf wijzigen.",
+      pin_locked: "Te veel foute pogingen. Wacht %{seconds} seconden.",
       pin_plain:
-        "De pagina draait op gewoon HTTP: de pincode gaat onversleuteld over het netwerk van de zaal. Hij houdt een nieuwsgierige gast van de knoppen af; het is geen beveiliging tegen het internet.",
+        "De pagina draait op gewoon HTTP: de pincode gaat onversleuteld over het netwerk van de zaal. Hij houdt een nieuwsgierige gast van de pagina af; het is geen beveiliging tegen het internet.",
       help_title: "Hulp vragen",
       help_hint:
         "Stuurt het rapport van deze box (zonder wachtwoorden en sleutels) naar de mensen die helpen, en geeft een code om aan hen door te geven.",
@@ -278,17 +274,23 @@ defmodule ArkabWeb.Words do
       switch_started: "Omschakelen. De box start opnieuw op.",
       switch_failed:
         "De box schakelde niet om. Probeer opnieuw, of gebruik Instellingen in zijn menu.",
-      pin_title: "Pincode voor op afstand",
-      pin_is_set: "Er is een pincode voor op afstand ingesteld.",
-      pin_is_not_set: "Geen pincode: vanaf een andere computer is deze pagina alleen-lezen.",
-      pin_new: "Nieuwe pincode (minstens 4 tekens)",
+      pin_title: "Pincode",
+      pin_current: "De pincode:",
+      pin_random: "Nieuwe willekeurige pincode",
+      pin_made: "Er is een nieuwe pincode gemaakt; elke andere browser moet de nieuwe geven.",
+      pin_notice:
+        "Bij het bijwerken van Arkab is een nieuwe pincode gemaakt: de oude was alleen als hash bewaard en kon niet getoond worden.",
+      pin_notice_ok: "Begrepen",
+      pin_long: "Een pincode heeft hooguit 64 tekens.",
+      pin_edge: "Een pincode mag niet met een spatie beginnen of eindigen.",
+      pin_invisible: "Een pincode mag geen onzichtbaar teken of stuurteken bevatten.",
+      pin_unwritable: "De pincode kon niet naar de schijf geschreven worden; de oude blijft.",
+      pin_new: "Nieuwe pincode (minstens 6 tekens)",
       pin_save: "Pincode opslaan",
-      pin_remove: "Pincode verwijderen",
-      pin_saved: "Pincode opgeslagen. Ontgrendelde browsers zijn weer vergrendeld.",
-      pin_removed: "Pincode verwijderd. Ontgrendelde browsers zijn weer vergrendeld.",
-      pin_short: "Een pincode heeft minstens 4 tekens nodig.",
+      pin_saved: "Pincode gewijzigd; elke andere browser moet de nieuwe geven.",
+      pin_short: "Een pincode heeft minstens 6 tekens nodig.",
       pin_hint:
-        "Met een pincode kan een telefoon of laptop op het netwerk van de zaal deze pagina ontgrendelen. De pincode instellen, wijzigen of verwijderen kan alleen op de brug zelf.",
+        "Elke andere computer, telefoon of laptop moet deze pincode geven voordat hij deze pagina ziet. Je ziet en wijzigt hem alleen op de brug zelf, en er is er altijd een.",
       version: "Versie",
       update_check: "Af en toe naar een nieuwere versie kijken",
       check_now: "Nu kijken",

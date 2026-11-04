@@ -97,15 +97,15 @@ defmodule ArkabWeb.BoxTest do
     refute has_element?(view, "#upgrade-card")
   end
 
-  test "a visitor from the network sees none of it, and the box is not even asked" do
+  test "a visitor from the network, PIN and all, sees none of it, and the box is not even asked" do
     box(%{system: @system, mode: "slave"})
+    ArkabWeb.Pin.Throttle.reset()
+    {:ok, grant} = ArkabWeb.Pin.attempt(ArkabWeb.Pin.current(), :visitor)
 
     conn =
-      Plug.Test.put_peer_data(build_conn(), %{
-        address: {192, 168, 1, 23},
-        port: 50_000,
-        ssl_cert: nil
-      })
+      build_conn()
+      |> Plug.Test.put_peer_data(%{address: {192, 168, 1, 23}, port: 50_000, ssl_cert: nil})
+      |> init_test_session(%{ArkabWeb.Pin.session_key() => grant})
 
     {:ok, view, _html} = live(conn, "/")
     refute has_element?(view, "#box")

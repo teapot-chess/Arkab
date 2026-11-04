@@ -68,26 +68,28 @@ defmodule ArkabWeb.HelpLive do
         <h2>Vanaf een andere computer</h2>
 
         <p>
-          Iedereen op het netwerk van de zaal kan deze pagina openen en kijken: de servers, de wachtrij, de poorten en de borden. Aanpassen kan op de brug zelf, of in een browser die met de pincode voor op afstand is ontgrendeld (hieronder): aansluiten, een server verwijderen, bijwerken en de instellingen onder "Dit programma". Vanaf een andere computer staat bovenaan "Alleen-lezen weergave" en zijn die knoppen er niet.
+          Elke andere computer, telefoon of laptop krijgt eerst de vraag naar de pincode van de brug, en ziet pas daarna iets: de servers, de wachtrij, de poorten, de borden en deze handleiding. De juiste pincode geeft die browser 12 uur lang de pagina met alle knoppen (aansluiten, een server verwijderen, bijwerken en de instellingen onder "Dit programma"), of tot je op "Weer vergrendelen" drukt. Op de brug zelf wordt nooit naar de pincode gevraagd.
         </p>
 
         <p>
-          Wil je de brug beheren zonder ernaast te zitten (een Raspberry Pi zonder scherm), zet dan op je eigen computer een SSH-poortdoorverwijzing op: <code>ssh -L 4050:localhost:4050 gebruiker@brug</code>, en open daarna <code>http://localhost:4050</code>. Voor de brug kom je dan van de brug zelf en heb je alle knoppen. Heeft de brug een eigen naam op het netwerk van de zaal die niet de computernaam is, zet die dan in <code>ARKAB_HOSTS</code>, anders antwoordt de pagina er niet op.
+          Wil je de brug beheren zonder ernaast te zitten (een Raspberry Pi zonder scherm), dan kan dat ook met een SSH-poortdoorverwijzing op je eigen computer: <code>ssh -L 4050:localhost:4050 gebruiker@brug</code>, en open daarna <code>http://localhost:4050</code>. Voor de brug kom je dan van de brug zelf: geen pincode, en je ziet en wijzigt de pincode zelf ook. Heeft de brug een eigen naam op het netwerk van de zaal die niet de computernaam is, zet die dan in <code>ARKAB_HOSTS</code>, anders antwoordt de pagina er niet op.
         </p>
 
         <p>
-          De andere manier is een pincode voor op afstand. Stel op de brug zelf, onder "Dit programma", een pincode van minstens 4 tekens in. Daarna biedt de alleen-lezenbanner op een andere computer (een telefoon of laptop op het netwerk van de zaal, of via
+          Er is altijd een pincode. Bij de eerste start maakt Arkab er zelf een van zes willekeurige cijfers. Je ziet hem op de brug zelf, onder "Dit programma", en daar wijzig je hem ook: typ een nieuwe (6 tot 64 tekens: cijfers, letters, leestekens en spaties ertussen mogen, maar geen spatie aan het begin of eind) of druk op "Nieuwe willekeurige pincode". Weghalen kan niet. Elke wijziging vergrendelt alle ontgrendelde browsers meteen, ook een pagina die al openstaat. Een browser die via
           <code>tailscale serve</code>
-          of een reverse proxy) "Pincode invoeren" aan, en de juiste pincode geeft die browser 12 uur lang alle knoppen, of tot je op "Weer vergrendelen" drukt. Een pincode wijzigen of verwijderen vergrendelt alle ontgrendelde browsers weer. Vijf foute pogingen sluiten een adres 5 minuten buiten. De pincode instellen, wijzigen of verwijderen kan alleen op de brug zelf, nooit vanuit een ontgrendelde browser. De pagina draait op gewoon HTTP, dus de pincode gaat onversleuteld over het netwerk van de zaal: het is een slot voor de zaal, geen beveiliging tegen het internet. Zonder pincode verandert er niets: vanaf een andere computer blijft de pagina alleen-lezen.
+          of een reverse proxy komt, telt als een andere computer. Na vijf foute pogingen moet een adres 5 seconden wachten, daarna 10, 20 en zo verder tot een kwartier, en dan helpt ook de juiste pincode niet; meer dan 40 foute pogingen per minuut over alle adressen samen laten iedereen even wachten. De pagina draait op gewoon HTTP, dus de pincode gaat onversleuteld over het netwerk van de zaal: het is een slot voor de zaal, geen beveiliging tegen het internet.
+        </p>
+
+        <p>
+          Had je een pincode van een oudere Arkab? Die was alleen als hash bewaard en kan niet getoond worden, dus bij de update maakt Arkab een nieuwe; de pagina op de brug zegt dat één keer.
         </p>
 
         <p>
           Een brug zonder scherm en toetsenbord (het Raspberry Pi-image) krijgt de pincode ook via de SD-kaart: stop de kaart in een computer, open
           <code>alnasl-arkab-pin.txt</code>
           in de opstartmap van de kaart, vul de regel <code>PIN=</code>
-          in (4 tot 64 tekens, cijfers mogen) en stop de kaart terug. Bij het opstarten geeft de kast de pincode aan Arkab, maakt de regel weer leeg zodat de pincode niet op de kaart blijft staan, en zet het resultaat onderaan het bestand.
-          <code>PIN=verwijderen</code>
-          haalt de pincode weg. Dit is de enige weg naast de pagina van de brug zelf, en je hebt er de kaart voor nodig.
+          in (6 tot 64 tekens) en stop de kaart terug. Bij het opstarten geeft de box de pincode aan Arkab, maakt de regel weer leeg zodat de pincode niet op de kaart blijft staan, en zet het resultaat onderaan het bestand. Een box met een scherm toont de pincode ook daar. Dit is de enige weg naast de pagina van de brug zelf, en je hebt er de kaart voor nodig.
         </p>
       </section>
 
@@ -206,26 +208,28 @@ defmodule ArkabWeb.HelpLive do
         <h2>From another computer</h2>
 
         <p>
-          Anyone on the hall's network can open this page and look: the servers, the queue, the ports and the boards. Changing anything works on the bridge itself, or in a browser unlocked with the remote PIN (below): joining, removing a server, updating and the settings under "This program". From another computer the top of the page says "Read-only view" and those buttons are not there.
+          Every other computer, phone or laptop is asked for the bridge's PIN first, and sees nothing before it gives it: not the servers, the queue, the ports, the boards, nor this manual. The right PIN gives that browser the page with every button (joining, removing a server, updating and the settings under "This program") for 12 hours, or until you press "Lock again". The bridge itself is never asked.
         </p>
 
         <p>
-          To manage a bridge without sitting beside it (a Raspberry Pi with no screen), set up an SSH port forward on your own computer: <code>ssh -L 4050:localhost:4050 user@bridge</code>, then open <code>http://localhost:4050</code>. To the bridge you then come from the bridge itself, and you have every button. If the bridge has a name of its own on the hall's network that is not the computer's name, put it in <code>ARKAB_HOSTS</code>, or the page will not answer to it.
+          To manage a bridge without sitting beside it (a Raspberry Pi with no screen), an SSH port forward on your own computer works too: <code>ssh -L 4050:localhost:4050 user@bridge</code>, then open <code>http://localhost:4050</code>. To the bridge you then come from the bridge itself: no PIN, and you see and change the PIN itself as well. If the bridge has a name of its own on the hall's network that is not the computer's name, put it in <code>ARKAB_HOSTS</code>, or the page will not answer to it.
         </p>
 
         <p>
-          The other way is a remote PIN. On the bridge itself, under "This program", set a PIN of at least 4 characters. From then on the read-only banner on another computer (a phone or laptop on the hall's network, or through
+          There is always a PIN. At its first start Arkab makes one of six random digits. You see it on the bridge itself, under "This program", and change it there: type a new one (6 to 64 characters: digits, letters, punctuation and spaces in between are fine, a space at the start or end is not) or press "New random PIN". It cannot be removed. Every change locks every unlocked browser at once, a page that is already open too. A browser that comes through
           <code>tailscale serve</code>
-          or a reverse proxy) offers "Enter PIN", and the right PIN gives that browser every button for 12 hours, or until you press "Lock again". Changing or removing the PIN locks every unlocked browser again. Five wrong tries lock an address out for 5 minutes. The PIN can only be set, changed or removed on the bridge itself, never from an unlocked browser. The page is plain HTTP, so the PIN crosses the hall's network in clear: it is a lock for the hall, not security against the internet. Without a PIN nothing changes: from another computer the page stays read-only.
+          or a reverse proxy counts as another computer. After five wrong tries an address waits 5 seconds, then 10, 20 and so on up to a quarter of an hour, and the right PIN does not help while it waits; more than 40 wrong tries a minute across all addresses make everybody wait a moment. The page is plain HTTP, so the PIN crosses the hall's network in clear: it is a lock for the hall, not security against the internet.
+        </p>
+
+        <p>
+          Had a PIN from an older Arkab? It was stored only as a hash and cannot be shown, so the update makes a new one; the page on the bridge says so, once.
         </p>
 
         <p>
           A bridge with no screen and no keyboard (the Raspberry Pi image) can be given its PIN on the SD card instead: put the card in a computer, open
           <code>alnasl-arkab-pin.txt</code>
           in the card's boot folder, fill in the <code>PIN=</code>
-          line (4 to 64 characters, digits are fine) and put the card back. At boot the box hands the PIN to Arkab, empties the line again so the PIN does not stay on the card, and writes the result at the bottom of the file.
-          <code>PIN=remove</code>
-          takes the PIN away. This is the only way besides the bridge's own page, and it needs the card in your hand.
+          line (6 to 64 characters) and put the card back. At boot the box hands the PIN to Arkab, empties the line again so the PIN does not stay on the card, and writes the result at the bottom of the file. A box with a screen shows the PIN there too. This is the only way besides the bridge's own page, and it needs the card in your hand.
         </p>
       </section>
 

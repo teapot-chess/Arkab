@@ -37,6 +37,15 @@
     },
   }
 
+  // A Show button for a password field on a page that is not a LiveView (the
+  // unlock page), where no JS command runs: data-reveal names the field.
+  document.addEventListener("click", (e) => {
+    const button = e.target.closest && e.target.closest("[data-reveal]")
+    if (!button) return
+    const field = document.getElementById(button.dataset.reveal)
+    if (field) field.type = field.type === "password" ? "text" : "password"
+  })
+
   window.addEventListener("DOMContentLoaded", () => {
     const csrf = document.querySelector("meta[name='csrf-token']").getAttribute("content")
     const liveSocket = new LiveView.LiveSocket("/live", Phoenix.Socket, {

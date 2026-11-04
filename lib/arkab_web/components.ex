@@ -19,7 +19,7 @@ defmodule ArkabWeb.Components do
   end
 
   attr :locale, :string, required: true
-  attr :page, :atom, values: [:status, :help], required: true
+  attr :page, :atom, values: [:status, :help, :unlock], required: true
 
   def foot(assigns) do
     ~H"""

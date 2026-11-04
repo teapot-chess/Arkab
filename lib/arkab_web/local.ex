@@ -1,10 +1,9 @@
 defmodule ArkabWeb.Local do
   @moduledoc """
-  Whether a visitor is on this machine. The status page may be read from
-  anywhere on the hall's network, but everything on it that changes something
-  (joining and leaving servers, updating, the Windows start-up entry) works
-  from the machine itself, or from a browser that was unlocked with the remote
-  PIN (`may_change?/2`); the PIN itself is set from the machine only.
+  Whether a visitor is on this machine. This machine is never asked for the
+  access PIN; every other browser needs one to see the pages at all
+  (`ArkabWeb.PinGate`) and to change anything on them (`may_change?/2`), and
+  the PIN itself is shown and changed from this machine only.
 
   "This machine" is the peer address of the connection, read from the socket
   and never from a header, and a loopback peer that arrives with a proxy
@@ -61,7 +60,7 @@ defmodule ArkabWeb.Local do
 
   @doc """
   Whether a visitor may change things: this machine, or a browser that holds
-  a valid remote-PIN grant (`ArkabWeb.Pin`). The one question every change
+  a valid access-PIN grant (`ArkabWeb.Pin`). The one question every change
   asks, in the LiveView and in the controllers; `local?` alone is for what
   must stay on this machine (setting the PIN, the launcher's Details).
   """

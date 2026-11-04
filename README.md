@@ -59,24 +59,28 @@ installs nothing without a yes. How releases are cut and what each file is:
 
 Install it from the table above; there is nothing to compile and no `mix` to run. A hall organiser needs a downloaded file and a browser, and the installers are built so that is all it takes: the Windows installer and the Linux script both start the bridge for you, and on a Mac you open `Arkab.app`. The bridge then keeps running by itself, and the status page described below is how you talk to it.
 
-Open `http://localhost:4050` on the machine the bridge runs on (or, from another computer, through
+Open `http://localhost:4050` on the machine the bridge runs on (or, from another computer, with the access PIN below, or through
 an SSH port forward: `ssh -L 4050:localhost:4050 user@bridge`). Paste or scan the join link that Alnasl shows:
 Halls, your hall, Bridges, *Add a bridge* (Alnasl's Setup wizard leads
 there too). The link is good for fifteen minutes and one bridge. That is the
 whole setup: the bridge fetches its own key, and the server decides which
-table each board belongs to. The page is open to the hall's network for
-looking, but from another computer it is a read-only view (servers, queue,
-ports, boards), marked as such: joining, removing a server, updating and the
-settings work from the bridge itself (the peer address of the connection
-decides, never a header; an SSH port forward counts as the bridge itself) or from
-a browser unlocked with the **remote PIN**: set one on the bridge itself under
-"This program" (4 characters at least, kept only as a salted PBKDF2 hash), and the
-read-only banner elsewhere offers "Enter PIN"; the right PIN gives that browser
-every button for 12 hours (also behind `tailscale serve` or a reverse proxy,
-which still count as remote), changing or removing the PIN locks them all again,
-and five wrong tries lock an address out for five minutes. The PIN can only be
-set from the bridge itself. The page is plain HTTP, so the PIN crosses the hall's
-network in clear: a lock for the hall, not security against the internet. A
+table each board belongs to. The page answers the hall's network, but every
+browser that is not the bridge itself is asked for the **access PIN** first
+and sees nothing before it gives it (the peer address of the connection
+decides, never a header; an SSH port forward counts as the bridge itself, and
+`tailscale serve` or a reverse proxy counts as remote). There is always a PIN:
+Arkab makes six random digits at its first start and keeps them in
+`access-pin` in its data folder (mode 0600), where the Pi image's box reads it
+to show on its screen. The bridge itself shows the PIN under "This program" and
+changes it there (6 to 64 printable characters, no space at either end, or
+"New random PIN"); it cannot be removed. The right PIN gives a browser the page
+and every button for 12 hours; any change of the PIN locks every unlocked
+browser at once. After five wrong tries an address waits 5 seconds, doubling up
+to 15 minutes, and the box as a whole takes 40 wrong tries a minute. A PIN from
+an older Arkab was kept only as a hash, so the update replaces it with a new one
+and says so once on the bridge's page. The page is plain HTTP, so the PIN crosses
+the hall's network in clear: a lock for the hall, not security against the
+internet. A
 request that asks for a host the bridge does not answer to gets a 403. The page speaks English and Dutch, the choice
 kept in a cookie; `/help` says what the page's parts mean.
 

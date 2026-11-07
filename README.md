@@ -141,6 +141,9 @@ real sockets on free local ports.
 
 ## Licence
 
-Copyright (c) 2026 teapot-chess. All rights reserved. No licence is granted to
-use, copy, modify or distribute this software. See [LICENSE](LICENSE) and
-[NOTICE](NOTICE). Arkab is not affiliated with any board maker.
+Copyright 2026 Jorian Burssens. Arkab is source available under the
+[Functional Source License, Version 1.1, Apache 2.0 Future License](LICENSE)
+(FSL-1.1-ALv2). You may use, copy, modify and share it for any purpose except
+offering a competing product or service. Each release turns into Apache-2.0
+two years after it was published. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Arkab is not affiliated with any board maker.

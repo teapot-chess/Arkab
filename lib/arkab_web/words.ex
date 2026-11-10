@@ -18,6 +18,8 @@ defmodule ArkabWeb.Words do
       servers: "Servers",
       connected: "connected",
       not_connected: "not connected",
+      server_behind:
+        "the server is behind by %{n} events (restored from a backup?); the current boards were sent again",
       remove: "Remove",
       confirm_remove: "Leave this server? It stops getting these boards.",
       no_servers: "Joined to no server yet.",
@@ -160,6 +162,8 @@ defmodule ArkabWeb.Words do
       servers: "Servers",
       connected: "verbonden",
       not_connected: "niet verbonden",
+      server_behind:
+        "de server loopt %{n} gebeurtenissen achter (hersteld uit een back-up?); de huidige borden zijn opnieuw gestuurd",
       remove: "Verwijderen",
       confirm_remove: "Deze server verlaten? Hij krijgt deze borden dan niet meer.",
       no_servers: "Nog bij geen enkele server aangesloten.",

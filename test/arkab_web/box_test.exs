@@ -212,7 +212,7 @@ defmodule ArkabWeb.BoxTest do
 
   test "the Dutch page has the card in Dutch" do
     box(%{system: @system, mode: "master"})
-    conn = build_conn() |> get("/lang/nl") |> recycle()
+    conn = build_conn() |> post("/lang/nl") |> recycle()
     {:ok, view, _html} = live(conn, "/")
     settled(view)
     assert has_element?(view, "#upgrade-card h4", "v7 is beschikbaar")

@@ -1,5 +1,5 @@
 defmodule ArkabWeb.LangController do
-  @moduledoc "`/lang/nl`, `/lang/en`: remember the language, go back to where you were."
+  @moduledoc "`POST /lang/nl`, `POST /lang/en`: remember the language, go back to where you were."
 
   use Phoenix.Controller, formats: [:html]
 

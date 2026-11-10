@@ -21,7 +21,7 @@ defmodule ArkabWeb.HelpTest do
     :ok
   end
 
-  defp dutch(conn), do: conn |> get("/lang/nl") |> recycle()
+  defp dutch(conn), do: conn |> post("/lang/nl") |> recycle()
 
   test "Dutch has every word English has" do
     assert Words.keys("nl") == Words.keys("en")
@@ -56,10 +56,10 @@ defmodule ArkabWeb.HelpTest do
     assert has_element?(view, "#join h2", "Aansluiten bij een server")
     assert has_element?(view, "#no-servers", "Nog bij geen enkele server")
     assert has_element?(view, "#help-link[href='/help']")
-    assert has_element?(view, "#lang-en[href='/lang/en']")
+    assert has_element?(view, "#lang-form-en[action='/lang/en']")
     assert has_element?(view, "#lang-nl[aria-current=true]")
 
-    conn = get(build_conn(), "/lang/en")
+    conn = post(build_conn(), "/lang/en")
     assert redirected_to(conn) == "/"
     {:ok, view, _html} = live(recycle(conn), "/")
     assert has_element?(view, "#join h2", "Join a server")
@@ -71,8 +71,13 @@ defmodule ArkabWeb.HelpTest do
     assert has_element?(view, "#join h2", "Aansluiten bij een server")
   end
 
+  test "language and lock change state only by POST" do
+    assert get(build_conn(), "/lang/nl").status == 404
+    assert get(build_conn(), "/lock").status == 404
+  end
+
   test "an unknown language changes nothing" do
-    conn = get(build_conn(), "/lang/xx")
+    conn = post(build_conn(), "/lang/xx")
     assert redirected_to(conn) == "/"
     {:ok, view, _html} = live(recycle(conn), "/")
     assert has_element?(view, "#join h2", "Join a server")

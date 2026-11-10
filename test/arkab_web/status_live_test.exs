@@ -95,7 +95,7 @@ defmodule ArkabWeb.StatusLiveTest do
     test "the door speaks Dutch too" do
       conn =
         lan()
-        |> get("/lang/nl")
+        |> post("/lang/nl")
         |> recycle()
         |> Plug.Test.put_peer_data(%{address: {10, 0, 0, 4}, port: 1, ssl_cert: nil})
         |> get("/unlock")

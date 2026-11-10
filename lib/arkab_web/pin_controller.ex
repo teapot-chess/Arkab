@@ -3,8 +3,8 @@ defmodule ArkabWeb.PinController do
   `/unlock`: the access PIN's door, where every browser that is not this
   machine is sent (`ArkabWeb.PinGate`). A right PIN puts a grant into the
   session cookie (`ArkabWeb.Pin`), which every page and every change on it
-  check again on the server; `/lock` (a link, since only a request can clear
-  the cookie, and locking one's own browser is not something to forge) takes
+  check again on the server; `POST /lock` (a form with the CSRF token, since only a request can clear
+  the cookie, and a link somebody else wrote must not lock your browser) takes
   it out. Plain requests and not LiveView events, because only a request can
   set a cookie.
 

@@ -290,6 +290,7 @@ defmodule ArkabWeb.StatusLive do
        )}
 
   defp words(:not_a_link, locale), do: Words.t(locale, :err_not_a_link)
+  defp words(:insecure, locale), do: Words.t(locale, :err_insecure)
   defp words(:used_or_expired, locale), do: Words.t(locale, :err_used_or_expired)
   defp words(:unreachable, locale), do: Words.t(locale, :err_unreachable)
   defp words(:version, locale), do: Words.t(locale, :err_version)
@@ -397,36 +398,38 @@ defmodule ArkabWeb.StatusLive do
     <main id="bridge">
       <header>
         <h1><.logo /> Arkab <span class="name">{@status.name}</span></h1>
-
+        
         <p class="note">{Words.t(@locale, :tagline)}</p>
       </header>
-
+      
       <section :if={@unlocked?} id="unlocked">
         <p class="note">{Words.t(@locale, :unlocked_note)}</p>
-
-        <p><a id="lock-link" href="/lock">{Words.t(@locale, :lock_again)}</a></p>
+        
+        <.form for={%{}} id="lock-form" action="/lock" method="post">
+          <button id="lock-link" type="submit">{Words.t(@locale, :lock_again)}</button>
+        </.form>
       </section>
-
+      
       <section :if={@notice} id="update">
         <h2>{Words.t(@locale, :update_available, version: @notice.version)}</h2>
-
+        
         <p :if={@notice.size} class="note">
           {Words.t(@locale, :update_size, mb: megabytes(@notice.size))}
         </p>
-
+        
         <p :if={@install_kind != :manual} class="note">{Words.t(@locale, :update_cost)}</p>
-
+        
         <p :if={@install_kind == :manual && !@notice.no_build} class="note">
           {Words.t(@locale, :update_manual)}
         </p>
-
+        
         <p :if={@notice.no_build} class="note">{Words.t(@locale, :update_no_build)}</p>
-
+        
         <form :if={@may_change?} id="update-form" phx-submit="update">
           <button :if={@install_kind != :manual} id="update-button" type="submit">
             {Words.t(@locale, :update_install)}
           </button>
-
+          
           <a
             :if={@install_kind == :manual && !@notice.no_build}
             id="update-link"
@@ -435,7 +438,7 @@ defmodule ArkabWeb.StatusLive do
           >
             {Words.t(@locale, :update_releases)}
           </a>
-
+          
           <button
             id="update-later"
             type="button"
@@ -446,7 +449,7 @@ defmodule ArkabWeb.StatusLive do
           </button>
         </form>
       </section>
-
+      
       <p
         :if={match?({:failed, _, _}, @last_update)}
         id="update-failed"
@@ -457,10 +460,10 @@ defmodule ArkabWeb.StatusLive do
           why: elem(@last_update, 2)
         )}
       </p>
-
+      
       <section id="servers">
         <h2>{Words.t(@locale, :servers)}</h2>
-
+        
         <ul :if={@status.servers != []} id="server-list">
           <li :for={server <- @status.servers} id={"server-#{server.id}"}>
             <span
@@ -476,6 +479,7 @@ defmodule ArkabWeb.StatusLive do
             <span :if={server.up? && Map.get(server, :behind, 0) > 0} class="note">
               {Words.t(@locale, :server_behind, n: server.behind)}
             </span>
+            
             <button
               :if={@may_change?}
               id={"remove-#{server.id}"}
@@ -488,25 +492,25 @@ defmodule ArkabWeb.StatusLive do
             </button>
           </li>
         </ul>
-
+        
         <p :if={@status.servers == []} class="note" id="no-servers">
           {Words.t(@locale, :no_servers)}
         </p>
-
+        
         <p id="waiting">{Words.t(@locale, :waiting)} <strong>{@status.waiting}</strong></p>
-
+        
         <p :if={@status.store.dropped > 0} id="store-dropped" class="error">
           {Words.t(@locale, :store_dropped, n: @status.store.dropped)}
         </p>
-
+        
         <p :if={@status.store.error} id="store-error" class="error">
           {Words.t(@locale, :store_error, why: @status.store.error)}
         </p>
       </section>
-
+      
       <section :if={@may_change?} id="join">
         <h2>{Words.t(@locale, :join_title)}</h2>
-
+        
         <form id="join-form" phx-submit="join">
           <input
             id="join-link"
@@ -518,22 +522,22 @@ defmodule ArkabWeb.StatusLive do
           <button id="join-button" type="submit" disabled={@joining?}>
             {if @joining?, do: Words.t(@locale, :joining), else: Words.t(@locale, :join)}
           </button>
-
+          
           <button id="scan-button" type="button" phx-hook="Scan" hidden>
             {Words.t(@locale, :scan)}
           </button>
         </form>
-        <video id="scan-video" phx-update="ignore" hidden playsinline></video>
+         <video id="scan-video" phx-update="ignore" hidden playsinline></video>
         <p :if={@message} id="join-message" class={elem(@message, 0)}>{elem(@message, 1)}</p>
-
+        
         <p class="note">{Words.t(@locale, :join_hint)}</p>
       </section>
-
+      
       <section id="ports">
         <h2>{Words.t(@locale, :ports_title)}</h2>
-
+        
         <p :if={@status.ports == []} class="note">{Words.t(@locale, :no_ports)}</p>
-
+        
         <ul id="port-list">
           <li :for={port <- @status.ports} id={"port-#{port.port}"}>
             <span class="mono">{port.port}</span> <span class="note">{port.description}</span>
@@ -553,21 +557,21 @@ defmodule ArkabWeb.StatusLive do
             </ul>
           </li>
         </ul>
-
+        
         <p class="note">
           {Words.t(@locale, :recording)} {if @status.recording?,
             do: Words.t(@locale, :on),
             else: Words.t(@locale, :off)}
         </p>
       </section>
-
+      
       <section id="program">
         <h2>{Words.t(@locale, :program_title)}</h2>
-
+        
         <p class="note">
           {Words.t(@locale, :version)} <span class="mono">{Updates.current_version()}</span>
         </p>
-
+        
         <p :if={@may_change?}>
           <label>
             <input
@@ -579,7 +583,7 @@ defmodule ArkabWeb.StatusLive do
             /> {Words.t(@locale, :update_check)}
           </label>
         </p>
-
+        
         <p :if={@may_change? and Autostart.supported?()}>
           <label>
             <input
@@ -591,66 +595,66 @@ defmodule ArkabWeb.StatusLive do
             /> {Words.t(@locale, :autostart)}
           </label>
         </p>
-
+        
         <p :if={@may_change?}>
           <button id="check-now" type="button" phx-click="check_now" disabled={@checking?}>
             {if @checking?, do: Words.t(@locale, :checking), else: Words.t(@locale, :check_now)}
           </button>
-
+          
           <span :if={@update_message} id="update-message" class={elem(@update_message, 0)}>
             {Words.t(@locale, elem(@update_message, 1))}
           </span>
         </p>
-
+        
         <div :if={@local? and Help.available?()} id="help">
           <h3>{Words.t(@locale, :help_title)}</h3>
-
+          
           <p class="note">{Words.t(@locale, :help_hint)}</p>
-
+          
           <p>
             <button id="help-send" type="button" phx-click="help" disabled={@helping?}>
               {if @helping?, do: Words.t(@locale, :help_sending), else: Words.t(@locale, :help_send)}
             </button>
           </p>
-
+          
           <div :if={match?({:ok, _}, @help)} id="help-result">
             <p class="note">{Words.t(@locale, :help_code)}</p>
-
+            
             <p id="help-code" style="font-size: 2.6em; font-weight: 700; letter-spacing: 0.08em;">
               {Help.format_code(elem(@help, 1).code)}
             </p>
-
+            
             <p>{Words.t(@locale, :help_read, until: help_until(elem(@help, 1).expires_at))}</p>
           </div>
-
+          
           <p :if={match?({:error, _}, @help)} id="help-error" class="error">
             {Words.t(@locale, help_error_key(elem(@help, 1)))}
           </p>
         </div>
-
+        
         <div :if={@local? and Box.available?() and @box} id="box">
           <h3>{Words.t(@locale, :box_title)}</h3>
-
+          
           <p class="note" id="box-version">
             {Words.t(@locale, :box_image,
               train: @box.system.train,
               version: @box.system.version
             )}
           </p>
-
+          
           <section :if={@box.system.offer && !@box.system.busy?} id="upgrade-card">
             <h4>{Words.t(@locale, :upgrade_available, train: @box.system.offer.train)}</h4>
-
+            
             <p :if={@box.system.offer.notes != ""} class="note" id="upgrade-notes">
               {@box.system.offer.notes}
             </p>
-
+            
             <p class="note">{Words.t(@locale, :upgrade_explain)}</p>
-
+            
             <p :if={!@box.system.updates_on?} id="upgrade-off" class="error">
               {Words.t(@locale, :upgrade_updates_off)}
             </p>
-
+            
             <p :if={!@upgrade_confirm?}>
               <button
                 id="upgrade-open"
@@ -661,22 +665,22 @@ defmodule ArkabWeb.StatusLive do
                 {Words.t(@locale, :upgrade_button, train: @box.system.offer.train)}
               </button>
             </p>
-
+            
             <div :if={@upgrade_confirm?} id="upgrade-confirm">
               <p>{Words.t(@locale, :upgrade_confirm, train: @box.system.offer.train)}</p>
-
+              
               <p>
                 <button id="upgrade-yes" type="button" phx-click="upgrade">
                   {Words.t(@locale, :upgrade_yes, train: @box.system.offer.train)}
                 </button>
-
+                
                 <button id="upgrade-no" type="button" phx-click="upgrade_cancel">
                   {Words.t(@locale, :cancel)}
                 </button>
               </p>
             </div>
           </section>
-
+          
           <p
             :if={!@box.system.offer && @box.system.offer_blocked}
             id="upgrade-blocked"
@@ -684,75 +688,75 @@ defmodule ArkabWeb.StatusLive do
           >
             {Words.t(@locale, :upgrade_blocked, version: @box.system.offer_blocked)}
           </p>
-
+          
           <div :if={@box.system.busy?} id="upgrade-progress">
             <p>
               {Words.t(@locale, phase_key(@box.system.phase))}
               <span :if={@box.system.progress} id="upgrade-percent">{@box.system.progress}%</span>
             </p>
-            <progress :if={@box.system.progress} max="100" value={@box.system.progress}></progress>
+             <progress :if={@box.system.progress} max="100" value={@box.system.progress}></progress>
             <p class="note">{Words.t(@locale, :upgrade_keep_power)}</p>
           </div>
-
+          
           <p :if={@box.system.request_error == "round_in_progress"} id="upgrade-round" class="error">
             {Words.t(@locale, :upgrade_round)}
           </p>
-
+          
           <p :if={@upgrade_message} id="upgrade-message" class={elem(@upgrade_message, 0)}>
             {Words.t(@locale, elem(@upgrade_message, 1))}
           </p>
-
+          
           <div :if={@box.mode == "slave"} id="mode-card">
             <h4>{Words.t(@locale, :mode_slave)}</h4>
-
+            
             <p class="note">{Words.t(@locale, :mode_slave_hint)}</p>
-
+            
             <p :if={!@switch_confirm?}>
               <button id="switch-open" type="button" phx-click="switch_open">
                 {Words.t(@locale, :switch_button)}
               </button>
             </p>
-
+            
             <div :if={@switch_confirm?} id="switch-confirm">
               <p>{Words.t(@locale, :switch_confirm)}</p>
-
+              
               <p>
                 <button id="switch-yes" type="button" phx-click="switch">
                   {Words.t(@locale, :switch_yes)}
                 </button>
-
+                
                 <button id="switch-no" type="button" phx-click="switch_cancel">
                   {Words.t(@locale, :cancel)}
                 </button>
               </p>
             </div>
-
+            
             <p :if={@switch_message} id="switch-message" class={elem(@switch_message, 0)}>
               {Words.t(@locale, elem(@switch_message, 1))}
             </p>
           </div>
         </div>
-
+        
         <div :if={@local?} id="pin">
           <h3>{Words.t(@locale, :pin_title)}</h3>
-
+          
           <div :if={@pin_notice?} id="pin-notice" class="error">
             <p>{Words.t(@locale, :pin_notice)}</p>
-
+            
             <p>
               <button id="pin-notice-ok" type="button" phx-click="pin_notice_ok">
                 {Words.t(@locale, :pin_notice_ok)}
               </button>
             </p>
           </div>
-
+          
           <p>
             {Words.t(@locale, :pin_current)}
             <strong id="pin-current" class="mono" style="font-size: 1.6em; letter-spacing: 0.05em;">
               {@pin}
             </strong>
           </p>
-
+          
           <form id="pin-form" phx-submit="pin_set">
             <input
               id="pin-input"
@@ -772,25 +776,25 @@ defmodule ArkabWeb.StatusLive do
             >
               {Words.t(@locale, :pin_show)}
             </button>
-            <button id="pin-save" type="submit">{Words.t(@locale, :pin_save)}</button>
+             <button id="pin-save" type="submit">{Words.t(@locale, :pin_save)}</button>
           </form>
-
+          
           <p>
             <button id="pin-random" type="button" phx-click="pin_new">
               {Words.t(@locale, :pin_random)}
             </button>
           </p>
-
+          
           <p :if={@pin_message} id="pin-message" class={elem(@pin_message, 0)}>
             {Words.t(@locale, elem(@pin_message, 1))}
           </p>
-
+          
           <p class="note">{Words.t(@locale, :pin_hint)}</p>
-
+          
           <p class="note">{Words.t(@locale, :pin_plain)}</p>
         </div>
       </section>
-      <.foot locale={@locale} page={:status} />
+       <.foot locale={@locale} page={:status} />
     </main>
     """
   end

@@ -47,6 +47,8 @@ defmodule ArkabWeb.Words do
       back: "Back to the bridge",
       language: "Language",
       err_not_a_link: "That is not a join link. It looks like https://server/join/K7Q-4MD.",
+      err_insecure:
+        "That link is plain http to a server outside this network, and the bridge's key would travel in the clear. Ask for an https link.",
       err_used_or_expired: "That link is used up or expired. Ask the server for a new one.",
       err_unreachable: "The server in that link does not answer from here.",
       err_version: "That server speaks another version of the link. Update one of the two.",
@@ -192,6 +194,8 @@ defmodule ArkabWeb.Words do
       language: "Taal",
       err_not_a_link:
         "Dat is geen aansluitlink. Zo'n link ziet eruit als https://server/join/K7Q-4MD.",
+      err_insecure:
+        "Die link is gewoon http naar een server buiten dit netwerk, en de sleutel van de brug zou onversleuteld onderweg zijn. Vraag om een https-link.",
       err_used_or_expired: "Die link is al gebruikt of verlopen. Vraag de server om een nieuwe.",
       err_unreachable: "De server in die link antwoordt niet vanaf hier.",
       err_version: "Die server spreekt een andere versie van de link. Werk een van de twee bij.",

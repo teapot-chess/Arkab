@@ -200,8 +200,8 @@ defmodule Arkab.ContractTest do
     test "the example answer is one the bridge joins with" do
       answer = Contract.read!("examples/join-response.json")
 
-      assert {:ok, %{url: "ws://hall.test/bridge/link", key: key, name: "Alnasl", owner?: true}} =
-               Join.redeem("http://hall.test/join/K7Q-4MD", %{},
+      assert {:ok, %{url: "ws://hall.local/bridge/link", key: key, name: "Alnasl", owner?: true}} =
+               Join.redeem("http://hall.local/join/K7Q-4MD", %{},
                  plug: fn conn -> Req.Test.json(conn, answer) end
                )
 

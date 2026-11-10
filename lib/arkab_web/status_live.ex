@@ -473,6 +473,9 @@ defmodule ArkabWeb.StatusLive do
               }
             ></span> <span class="server-name">{server.name}</span>
             <span :if={!server.up? && server.error} class="note">{server.error}</span>
+            <span :if={server.up? && Map.get(server, :behind, 0) > 0} class="note">
+              {Words.t(@locale, :server_behind, n: server.behind)}
+            </span>
             <button
               :if={@may_change?}
               id={"remove-#{server.id}"}

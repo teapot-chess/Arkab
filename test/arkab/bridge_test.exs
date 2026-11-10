@@ -143,6 +143,31 @@ defmodule Arkab.BridgeTest do
     assert seqs == Enum.to_list(hd(seqs)..List.last(seqs))
   end
 
+  test "a server restored from a backup is believed: the bridge says it is behind", %{
+    dir: dir,
+    capture: capture
+  } do
+    a = FakeServer.start(codes: ["A"])
+    start_bridge(dir, [])
+    {:ok, _} = Bridge.join(FakeServer.link(a, "A"))
+    eventually(fn -> FakeServer.get(a, :sockets) != [] end)
+    :ok = Arkab.Bridge.Ports.add(replay(capture))
+    eventually(fn -> positions(a) == @moves end)
+    eventually(fn -> Store.waiting() == 0 end)
+
+    acked = FakeServer.get(a, :seen)
+    assert acked > 0
+
+    # The server comes back from a backup that knew nothing of this.
+    FakeServer.set(a, :seen, 0)
+    FakeServer.set(a, :events, [])
+    FakeServer.down(a)
+    FakeServer.up(a)
+
+    behind = fn -> Enum.find(Bridge.status().servers, &(&1.behind > 0)) end
+    assert eventually(fn -> behind.() end, 40_000).behind > 0
+  end
+
   test "an old and a new board on one adapter are two rows, before and after a rescan", %{
     dir: dir
   } do

@@ -55,7 +55,7 @@ defmodule Arkab.Bridge.Link do
     end
   end
 
-  @doc "`%{up?, error, acked, sent}`."
+  @doc "`%{up?, error, acked, sent, behind}`."
   def info(pid) do
     GenServer.call(pid, :info)
   catch
@@ -90,6 +90,7 @@ defmodule Arkab.Bridge.Link do
        up?: false,
        acked: 0,
        sent: 0,
+       behind: 0,
        error: nil,
        backoff: 1_000,
        heard: now(),
@@ -99,7 +100,14 @@ defmodule Arkab.Bridge.Link do
 
   @impl true
   def handle_call(:info, _from, state) do
-    {:reply, %{up?: state.up?, error: state.error, acked: state.acked, sent: state.sent}, state}
+    {:reply,
+     %{
+       up?: state.up?,
+       error: state.error,
+       acked: state.acked,
+       sent: state.sent,
+       behind: state.behind
+     }, state}
   end
 
   def handle_call(:leave, _from, %{up?: true} = state) do
@@ -255,11 +263,20 @@ defmodule Arkab.Bridge.Link do
   # --- the conversation --------------------------------------------------------
 
   defp message(%{"type" => "welcome", "seen" => seen}, state) when is_integer(seen) do
-    acked = max(state.acked, seen)
+    # A server that has seen less than this bridge was acked (restored from a
+    # backup) is believed: what is still queued above its number is sent, and
+    # the board state goes out again below. What was already pruned is gone,
+    # and the status page says by how much the server is behind.
+    behind = max(state.acked - seen, 0)
+
+    if behind > 0,
+      do: Logger.warning("arkab: #{state.server.url} is behind by #{behind} events (restored?)")
+
+    acked = if behind > 0, do: seen, else: max(state.acked, seen)
     if acked > state.server.acked, do: Store.ack(state.id, acked)
     Process.send_after(self(), :ping, @ping_ms)
 
-    %{state | up?: true, error: nil, backoff: 1_000, acked: acked, sent: acked}
+    %{state | up?: true, error: nil, backoff: 1_000, acked: acked, sent: acked, behind: behind}
     |> send_boards()
     |> pump()
   end

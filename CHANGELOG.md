@@ -15,6 +15,8 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-10
+
 - [Security] **Plain http links are for the hall's own network only.** A join link of the form `http://` to a host outside loopback, the private ranges, 100.64/10 and `.local` is refused with a message saying why, since the bridge's key rides in the first frame and would cross the internet in the clear. https is welcome anywhere.
 - [Security] **Switching language and locking again are POSTs with a CSRF token.** They were links, which meant that a page that wasn't ours could lock your browser or change its language by being clever with an image tag. The foot's EN and NL are now small forms, and "Lock again" a button.
 

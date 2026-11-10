@@ -29,6 +29,29 @@ defmodule Arkab.JoinTest do
     assert Bridge.join("nonsense") == {:error, :not_a_link}
   end
 
+  test "plain http is for private hosts only" do
+    for host <- [
+          "127.0.0.1",
+          "localhost",
+          "10.1.2.3",
+          "172.20.0.1",
+          "192.168.1.20",
+          "100.100.1.1",
+          "hall.local",
+          "[::1]",
+          "[fd00::1]"
+        ] do
+      assert {:ok, _} = Join.parse("http://#{host}/join/K7Q-4MD"), host
+    end
+
+    for host <- ["example.com", "8.8.8.8", "172.32.0.1", "100.128.0.1", "[2001:db8::1]"] do
+      assert Join.parse("http://#{host}/join/K7Q-4MD") == {:error, :insecure}, host
+    end
+
+    assert {:ok, _} = Join.parse("https://example.com/join/K7Q-4MD")
+    assert Bridge.join("http://example.com/join/K7Q-4MD") == {:error, :insecure}
+  end
+
   test "pasting the link joins the server: the key is fetched and kept, never typed" do
     server = FakeServer.start()
     assert {:ok, id} = Bridge.join(FakeServer.link(server))

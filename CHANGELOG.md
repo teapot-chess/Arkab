@@ -15,6 +15,9 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+- [Security] **Plain http links are for the hall's own network only.** A join link of the form `http://` to a host outside loopback, the private ranges, 100.64/10 and `.local` is refused with a message saying why, since the bridge's key rides in the first frame and would cross the internet in the clear. https is welcome anywhere.
+- [Security] **Switching language and locking again are POSTs with a CSRF token.** They were links, which meant that a page that wasn't ours could lock your browser or change its language by being clever with an image tag. The foot's EN and NL are now small forms, and "Lock again" a button.
+
 - [Fix] **A server restored from a backup is believed, not argued with.** A bridge that had been acked up to event 800 met a server that said it had seen 500, kept its own number and sent nothing, leaving moves 501 to 800 missing and nobody told. Now the bridge takes the server's word, sends whatever is still queued above it and the current boards again, and the status page says the server is behind by 300 events. Events already pruned cannot be resent; it can only be honest about that.
 
 - [Change] **Reference source, no longer a free-for-all.** The Functional Source License lasted an afternoon, which is roughly the lifespan of a decision nobody finished thinking about. Arkab's source is now published for reference under the Microsoft Reference Source License (Ms-RSL): you may read it, and that is the whole grant. The builds we publish remain free to use for running chess events; builds you make yourself are not covered. The version published under the FSL today keeps the FSL for whoever already has it, since a licence, unlike a mood, cannot be taken back. CI moves to GitHub-hosted runners, and the release workflow is switched off until December.

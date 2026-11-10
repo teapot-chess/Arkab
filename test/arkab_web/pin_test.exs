@@ -323,7 +323,7 @@ defmodule ArkabWeb.PinTest do
 
     test "locking again takes the grant away" do
       conn = unlock(:lan, "2468-hall")
-      conn = conn |> recycle() |> as(:lan) |> get("/lock")
+      conn = conn |> recycle() |> as(:lan) |> post("/lock")
       assert redirected_to(conn) == "/"
       assert {:error, {:redirect, %{to: "/unlock"}}} = open(conn, :lan)
     end

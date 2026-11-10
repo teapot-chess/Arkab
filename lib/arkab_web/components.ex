@@ -27,8 +27,18 @@ defmodule ArkabWeb.Components do
       <a :if={@page == :status} id="help-link" href="/help">{Words.t(@locale, :help)}</a>
       <a :if={@page == :help} id="back-link" href="/">{Words.t(@locale, :back)}</a>
       <span class="note">{Words.t(@locale, :language)}:</span>
-      <a id="lang-en" href="/lang/en" aria-current={to_string(@locale == "en")}>EN</a>
-      <a id="lang-nl" href="/lang/nl" aria-current={to_string(@locale == "nl")}>NL</a>
+      <.form
+        :for={code <- ~w(en nl)}
+        for={%{}}
+        id={"lang-form-#{code}"}
+        action={"/lang/#{code}"}
+        method="post"
+        class="lang"
+      >
+        <button id={"lang-#{code}"} type="submit" aria-current={to_string(@locale == code)}>
+          {String.upcase(code)}
+        </button>
+      </.form>
     </footer>
     """
   end

@@ -18,10 +18,10 @@ defmodule ArkabWeb.Router do
 
   scope "/", ArkabWeb do
     pipe_through :browser
-    get "/lang/:code", LangController, :set
+    post "/lang/:code", LangController, :set
     get "/unlock", PinController, :show
     post "/unlock", PinController, :unlock
-    get "/lock", PinController, :lock
+    post "/lock", PinController, :lock
   end
 
   # Every page behind the access PIN: this machine, or a browser that gave it.

@@ -290,6 +290,7 @@ defmodule ArkabWeb.StatusLive do
        )}
 
   defp words(:not_a_link, locale), do: Words.t(locale, :err_not_a_link)
+  defp words(:insecure, locale), do: Words.t(locale, :err_insecure)
   defp words(:used_or_expired, locale), do: Words.t(locale, :err_used_or_expired)
   defp words(:unreachable, locale), do: Words.t(locale, :err_unreachable)
   defp words(:version, locale), do: Words.t(locale, :err_version)
@@ -404,7 +405,9 @@ defmodule ArkabWeb.StatusLive do
       <section :if={@unlocked?} id="unlocked">
         <p class="note">{Words.t(@locale, :unlocked_note)}</p>
 
-        <p><a id="lock-link" href="/lock">{Words.t(@locale, :lock_again)}</a></p>
+        <.form for={%{}} id="lock-form" action="/lock" method="post">
+          <button id="lock-link" type="submit">{Words.t(@locale, :lock_again)}</button>
+        </.form>
       </section>
 
       <section :if={@notice} id="update">
@@ -476,6 +479,7 @@ defmodule ArkabWeb.StatusLive do
             <span :if={server.up? && Map.get(server, :behind, 0) > 0} class="note">
               {Words.t(@locale, :server_behind, n: server.behind)}
             </span>
+
             <button
               :if={@may_change?}
               id={"remove-#{server.id}"}

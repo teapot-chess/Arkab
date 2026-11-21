@@ -15,6 +15,8 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+- [Fix] **An old wooden board on a loop answers in full again.** Arkab now leaves DTR off and RTS on after opening a port, which is where DGT's own LiveChess ends up a second after it opens one. With DTR on as well, a firmware 1.9 board cut every whole-board answer short after a dozen bytes (0 of 15 complete, 15 of 15 with DTR off); the 4.2 boards on the same loop did not care either way.
+
 ## [0.6.0] - 2026-11-10
 
 - [Security] **Plain http links are for the hall's own network only.** A join link of the form `http://` to a host outside loopback, the private ranges, 100.64/10 and `.local` is refused with a message saying why, since the bridge's key rides in the first frame and would cross the internet in the clear. https is welcome anywhere.

@@ -15,6 +15,8 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-21
+
 - [Fix] **An old wooden board on a loop answers in full again.** Arkab now leaves DTR off and RTS on after opening a port, which is where DGT's own LiveChess ends up a second after it opens one. With DTR on as well, a firmware 1.9 board cut every whole-board answer short after a dozen bytes (0 of 15 complete, 15 of 15 with DTR off); the 4.2 boards on the same loop did not care either way.
 
 ## [0.6.0] - 2026-11-10

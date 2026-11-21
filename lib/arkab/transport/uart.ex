@@ -17,15 +17,16 @@ defmodule Arkab.Transport.Uart do
   signal, which a chess board never sends. Only the `cu.` one is offered
   (`one_per_device/1`), so nobody has to know that.
 
-  DTR and RTS are switched on after every open. A DGT RS-232 board has no
-  power supply for its transmitter: it borrows the voltage from the host's
-  DTR and RTS lines. Windows' driver turns RTS on by itself and
-  `circuits_uart` asks for it there; on a Unix it asks for neither, and a
-  Mac leaves whatever the adapter's driver feels like. The result, seen on
-  three boards behind an FTDI adapter: short answers arrive, every long one
-  fades out after a few bytes with a zero last, and DGT's own LiveChess
-  (which asserts both) works on the same desk. So we assert both as well,
-  on every system and for both drivers (`power_line/3`).
+  After every open RTS is switched on and DTR off, which is what DGT's own
+  LiveChess ends up with (a USB capture of it, 2026-11-21: it opens with
+  both on and drops DTR a second later). A DGT RS-232 board borrows the
+  voltage for its transmitter from the host's lines, so with neither
+  asserted - a Unix asks for neither, a Mac leaves whatever its adapter's
+  driver likes - long answers fade out after a few bytes with a zero last.
+  With DTR on as well, an old wooden board (firmware 1.9) on a loop does
+  exactly the same: 0 of 15 whole boards complete with DTR on, 15 of 15 with
+  it off, and the five 4.2 boards on that loop answered in full either way.
+  So: RTS on, DTR off, on every system and for both drivers (`power_line/3`).
   """
 
   @behaviour Arkab.Transport
@@ -123,18 +124,21 @@ defmodule Arkab.Transport.Uart do
   end
 
   @doc """
-  Asserts DTR and RTS on an open port, through `module` (`Circuits.UART` in
+  Sets RTS on and DTR off on an open port, through `module` (`Circuits.UART` in
   life, a stand-in in the test). A failure is logged and swallowed: a port
   that opened is better than a port that did not, even a stingy one.
   """
   def power_line(module, pid, port) do
-    for {name, line} <- [dtr: :set_dtr, rts: :set_rts] do
-      case apply(module, line, [pid, true]) do
+    for {name, line, on?} <- [{:dtr, :set_dtr, false}, {:rts, :set_rts, true}] do
+      case apply(module, line, [pid, on?]) do
         :ok ->
           :ok
 
         other ->
-          Logger.warning("serial port #{port}: could not turn #{name} on: #{inspect(other)}")
+          Logger.warning(
+            "serial port #{port}: could not turn #{name} #{if on?, do: "on", else: "off"}: " <>
+              inspect(other)
+          )
       end
     end
 
@@ -142,7 +146,7 @@ defmodule Arkab.Transport.Uart do
   catch
     kind, reason ->
       Logger.warning(
-        "serial port #{port}: could not turn DTR and RTS on: " <>
+        "serial port #{port}: could not set DTR and RTS: " <>
           Exception.format(kind, reason, __STACKTRACE__)
       )
 

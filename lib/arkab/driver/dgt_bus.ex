@@ -670,7 +670,7 @@ defmodule Arkab.Driver.DgtBus do
     if Bus.dropped_mid_answer?(command(waiting.kind), waiting.rx),
       do:
         "; the line dropped mid-answer - on a Mac or a new adapter, " <>
-          "check that DTR and RTS are on",
+          "check that RTS is on (and DTR off, for an old wooden board)",
       else: ""
   end
 

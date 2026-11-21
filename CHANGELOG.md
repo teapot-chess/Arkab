@@ -15,6 +15,7 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+- [Fix] **Serial ports on an older Mac.** The Mac builds promise macOS 10.13 (Intel) and 11 (Apple Silicon), but the serial program asked IOKit for a value that only exists from macOS 12, and died the moment it was asked for the ports: "no serial devices found" on a 10.14 MacBook. It now asks the way every macOS understands.
 ## [0.6.1] - 2026-11-21
 
 - [Fix] **An old wooden board on a loop answers in full again.** Arkab now leaves DTR off and RTS on after opening a port, which is where DGT's own LiveChess ends up a second after it opens one. With DTR on as well, a firmware 1.9 board cut every whole-board answer short after a dozen bytes (0 of 15 complete, 15 of 15 with DTR off); the 4.2 boards on the same loop did not care either way.

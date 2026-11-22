@@ -150,7 +150,6 @@ defmodule Arkab.Driver.LiveChess do
   end
 
   defp describe({:illegal, ply, why}), do: "move #{ply}: #{why}"
-  defp describe(other), do: inspect(other)
 
   defp gone(%{connected?: false} = state), do: state
 

@@ -98,6 +98,7 @@ When two servers disagree, both are obeyed and the later one wins.
 | `resend` | `board` (optional) | the whole board again: status, what it says about itself, position, clock. The server sends this on every connect |
 | `rescan` | `port` (optional) | read the port(s) again from scratch, which finds a loop again |
 | `add_port` | `port` | read this port from now on, including after a restart |
+| `add_folder` | `folder` | owner only: read this DGT LiveChess export folder on the bridge's machine from now on, a board per game of the round being played (`<name>#<game>`); it is listed with the ports under its name, `LiveChess` (then `LiveChess 2`...), the folder as its description. `no_such_folder` when it is not a folder there |
 | `forget_port` | `port` | owner only: stop reading it |
 | `forget_board` | `board` | owner only: stop reading this board until its port is added again |
 | `record` | `on` | capture files on or off |

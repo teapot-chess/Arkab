@@ -9,6 +9,13 @@ board emulator, the transports and the capture format came from Alnasl
 them from this package. Changes: the module names (Alnasl.* -> Arkab.*) and
 the application environment (:alnasl -> :arkab).
 
+lib/arkab/chess.ex and lib/arkab/pgn.ex are copies of Alnasl's
+Alnasl.Chess and Alnasl.PgnReader (themselves from OpenResults, by the same
+owner), trimmed to what replaying a LiveChess export needs. Changes: the
+module names, the parts left out (SAN writing, game states, multi-game
+reading), piece letters looked up instead of converted to atoms, and a
+PGN read only when it ends with its result token.
+
 Arkab is not affiliated with or endorsed by DGT (Digital Game Technology
 B.V.). "DGT" is their trademark. The serial protocol implemented in
 lib/arkab/dgt/ follows DGT's published protocol description for

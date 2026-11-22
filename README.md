@@ -92,12 +92,16 @@ kept in a cookie; `/help` says what the page's parts mean.
 | `ARKAB_HOSTS` | extra host names the page answers to, comma-separated (a DNS name the hall's router gives the bridge); the machine's own name and addresses are always accepted unless `ARKAB_LISTEN=local` |
 | `ARKAB_UART=0` / `1` | build without or with the serial library (default: with it, except on Windows where it has to be asked for). When it is not set, `ALNASL_UART` decides, so a server built with `ALNASL_UART=0` builds Arkab without it too |
 
+### A hall with DGT LiveChess
+
+A hall that runs DGT LiveChess can be read without touching its boards: switch on LiveChess's filesystem exporter, and enter the folder it writes to under "LiveChess export folder" on the status page (or let the owner server send `add_folder`). The bridge looks at the folder once a second; every game of the round being played (`round-N/game-M.pgn`, the round whose files were written last) becomes a board called `LiveChess#M`, with its positions and clocks taken from the PGN. A game already under way when the bridge first sees it is handed over as the board's memory, so Alnasl catches up move by move instead of guessing; moves after that arrive one position at a time. The folder may hold `tournament.json` itself or one subfolder per tournament (the newest is read). See `Arkab.LiveChess` and `Arkab.Driver.LiveChess`.
+
 What the bridge promises:
 
 - An event is on disk before it is sent anywhere.
 - Each server has its own cursor, so a server that is down holds up nobody else.
 - An event leaves the queue only when every server has acknowledged it.
-- Commands from the servers (rescan, add or forget a port, send a board again, recording on or off) are applied in the order they arrived. Only a server joined as owner may make the bridge forget a board or a port.
+- Commands from the servers (rescan, add or forget a port, add a LiveChess folder, send a board again, recording on or off) are applied in the order they arrived. Only a server joined as owner may make the bridge forget a board or a port, or read a folder on its disk.
 - Remove, on either side, ends the link for both.
 
 The link itself is described in [docs/protocol.md](docs/protocol.md).

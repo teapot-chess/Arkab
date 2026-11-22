@@ -51,6 +51,23 @@ defmodule ArkabWeb.StatusLiveTest do
     assert has_element?(view, "#no-servers")
   end
 
+  test "a LiveChess export folder is added from the page, and listed with the ports" do
+    folder = Path.join(System.tmp_dir!(), "arkab-page-lc-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(folder)
+    on_exit(fn -> File.rm_rf!(folder) end)
+
+    {:ok, view, _html} = live(build_conn(), "/")
+    assert has_element?(view, "#folder-form")
+
+    view |> form("#folder-form", %{folder: Path.join(folder, "nope")}) |> render_submit()
+    assert has_element?(view, "#folder-message.error")
+
+    view |> form("#folder-form", %{folder: folder}) |> render_submit()
+    assert has_element?(view, "#folder-message.ok")
+    assert has_element?(view, "#port-list li", "LiveChess")
+    assert [%{"folder" => ^folder, "name" => "LiveChess"}] = Arkab.Bridge.Store.get("ports")
+  end
+
   test "a newer version is offered, with its size, and Later puts it away" do
     Arkab.Updates.Checker.put(%{
       version: "9.9.9",

@@ -163,6 +163,7 @@ defmodule Arkab.ContractTest do
         "resend" => %{},
         "rescan" => %{port: "COM3"},
         "add_port" => %{port: "COM7"},
+        "add_folder" => %{folder: "C:/LiveChess/export"},
         "forget_port" => %{port: "COM4"},
         "forget_board" => %{board: "COM4#12799"},
         "record" => %{on: true}

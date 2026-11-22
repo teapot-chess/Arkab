@@ -56,7 +56,8 @@ defmodule Arkab.Bridge.Board do
   @doc "Every board's name, sorted."
   def ids do
     Arkab.Bridge.BoardRegistry
-    |> Registry.select([{{:"$1", :_, :_}, [], [:"$1"]}])
+    # Names only: a LiveChess folder's watcher is registered here too, as {:folder, name}.
+    |> Registry.select([{{:"$1", :_, :_}, [{:is_binary, :"$1"}], [:"$1"]}])
     |> Enum.sort()
   end
 
@@ -91,6 +92,11 @@ defmodule Arkab.Bridge.Board do
       info: %{},
       position: nil,
       clock: nil,
+      # The board's memory as last read, kept only for a driver whose memory
+      # is its whole game (`Arkab.Driver.LiveChess`) and sent again with the
+      # rest. A DGT board's memory is read when it is met, not on request.
+      resend_history?: Keyword.get(opts, :resend_history, false),
+      history: nil,
       # The last {t, speed, next} of a played board: what "now" is for it.
       played: nil,
       poll: nil,
@@ -150,6 +156,7 @@ defmodule Arkab.Bridge.Board do
     events =
       [if(state.connected?, do: :connected, else: :disconnected)] ++
         if(state.info == %{}, do: [], else: [{:info, state.info}]) ++
+        if(state.history, do: [{:history, state.history}], else: []) ++
         if(state.position, do: [{:position, state.position}], else: []) ++
         if(state.clock, do: [{:clock, state.clock}], else: [])
 
@@ -220,6 +227,10 @@ defmodule Arkab.Bridge.Board do
   defp answered(n), do: {:poll, :ok, n}
 
   defp remember(state, {:position, board}), do: %{state | position: board}
+
+  defp remember(%{resend_history?: true} = state, {:history, events}),
+    do: %{state | history: events}
+
   defp remember(state, {:clock, reading}), do: %{state | clock: reading}
   defp remember(state, :connected), do: notify(%{state | connected?: true})
   defp remember(state, :disconnected), do: notify(%{state | connected?: false})

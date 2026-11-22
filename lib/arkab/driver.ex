@@ -28,7 +28,8 @@ defmodule Arkab.Driver do
 
   The drivers here: `Arkab.Driver.Replay` (a capture file played back),
   `Arkab.Driver.DgtSerial` (one DGT board on a serial port) and
-  `Arkab.Driver.DgtBus` (a loop of DGT boards). The bus driver needs
+  `Arkab.Driver.DgtBus` (a loop of DGT boards), and `Arkab.Driver.LiveChess`
+  (one game of a DGT LiveChess export folder). The bus driver needs
   `Arkab.Drivers` running.
   """
 

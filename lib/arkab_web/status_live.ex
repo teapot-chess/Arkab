@@ -22,7 +22,7 @@ defmodule ArkabWeb.StatusLive do
   alias Phoenix.LiveView.JS
 
   # Everything that changes something. The rest of the events are none.
-  @changing ~w(join update later update_check check_now autostart remove)
+  @changing ~w(join update later update_check check_now autostart remove add_folder)
   # The PIN's own: this machine only, a grant is not enough.
   @local_only ~w(pin_set pin_new pin_notice_ok help upgrade_open upgrade_cancel upgrade switch_open switch_cancel switch)
 
@@ -38,6 +38,7 @@ defmodule ArkabWeb.StatusLive do
      |> assign(
        joining?: false,
        message: nil,
+       folder_message: nil,
        update_message: nil,
        checking?: false,
        local?: Local.local_socket?(socket, session),
@@ -126,6 +127,17 @@ defmodule ArkabWeb.StatusLive do
       :ok -> {:noreply, load(socket)}
       {:error, _words} -> {:noreply, assign(socket, update_message: {:error, :autostart_failed})}
     end
+  end
+
+  # A DGT LiveChess export folder on this machine: its games become boards.
+  defp change("add_folder", %{"folder" => folder}, socket) do
+    message =
+      case Arkab.Bridge.Ports.add_folder(folder) do
+        :ok -> {:ok, Words.t(socket.assigns.locale, :folder_added)}
+        {:error, _why} -> {:error, Words.t(socket.assigns.locale, :folder_missing)}
+      end
+
+    {:noreply, socket |> assign(folder_message: message) |> load()}
   end
 
   defp change("remove", %{"id" => id}, socket) do
@@ -557,6 +569,26 @@ defmodule ArkabWeb.StatusLive do
             </ul>
           </li>
         </ul>
+
+        <form :if={@may_change?} id="folder-form" phx-submit="add_folder">
+          <label for="folder-path">{Words.t(@locale, :folder_label)}</label>
+          <input
+            id="folder-path"
+            type="text"
+            name="folder"
+            placeholder={Words.t(@locale, :folder_placeholder)}
+            autocomplete="off"
+          />
+          <button id="folder-button" type="submit">{Words.t(@locale, :folder_add)}</button>
+        </form>
+        <p
+          :if={@folder_message}
+          id="folder-message"
+          class={elem(@folder_message, 0)}
+        >
+          {elem(@folder_message, 1)}
+        </p>
+        <p :if={@may_change?} class="note">{Words.t(@locale, :folder_hint)}</p>
 
         <p class="note">
           {Words.t(@locale, :recording)} {if @status.recording?,

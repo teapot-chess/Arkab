@@ -129,6 +129,18 @@ defmodule ArkabWeb.HelpLive do
         </p>
       </section>
 
+      <section id="help-livechess">
+        <h2>Een zaal met DGT LiveChess</h2>
+
+        <p>
+          Draait de zaal DGT LiveChess, dan kan de brug de partijen lezen die LiveChess wegschrijft, in plaats van de borden zelf. Zet in LiveChess de export naar het bestandssysteem aan (de "filesystem exporter") en kies een map. Vul die map in bij "Exportmap van LiveChess", onder Poorten en borden, en druk op "Map lezen". Alnasl kan hetzelfde vragen vanaf het tabblad Bruggen.
+        </p>
+
+        <p>
+          Elke partij van de ronde die gespeeld wordt, wordt een bord: LiveChess#1, LiveChess#2 enzovoort, naar het nummer van de partij. Een nieuwe ronde zet nieuwe partijen op dezelfde borden. De stand en de klokken komen uit de PGN-bestanden van LiveChess; een bestand dat net geschreven wordt, wordt een seconde later opnieuw gelezen. De namen van de spelers komen, zoals bij elk bord, uit OpenPairings.
+        </p>
+      </section>
+
       <section id="help-update">
         <h2>Een nieuwere versie</h2>
 
@@ -267,6 +279,18 @@ defmodule ArkabWeb.HelpLive do
 
         <p>
           "Recording" says whether the bridge keeps everything the boards say, raw, so it can be replayed later.
+        </p>
+      </section>
+
+      <section id="help-livechess">
+        <h2>A hall with DGT LiveChess</h2>
+
+        <p>
+          When the hall runs DGT LiveChess, the bridge can read the games LiveChess writes out instead of the boards themselves. In LiveChess, switch on the export to the file system (the "filesystem exporter") and pick a folder. Enter that folder under "LiveChess export folder", in Ports and boards, and press "Read folder". Alnasl can ask for the same from its Bridges tab.
+        </p>
+
+        <p>
+          Every game of the round being played becomes a board: LiveChess#1, LiveChess#2 and so on, by the game's number. The next round puts its games on the same boards. Positions and clocks come from LiveChess's PGN files; a file caught while it is being written is read again a second later. The players' names come from OpenPairings, as for any board.
         </p>
       </section>
 

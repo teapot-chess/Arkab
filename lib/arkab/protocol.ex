@@ -71,12 +71,17 @@ defmodule Arkab.Protocol do
   every port), `add_port` (`port`), `forget_port` (`port`, owner only),
   `forget_board` (`board`, owner only), `resend` (`board`, or every board:
   the whole board again - status, what it said about itself, the position,
-  the clock), `record` (`on`: true or false).
+  the clock), `record` (`on`: true or false), `add_folder` (`folder`, owner
+  only: a DGT LiveChess export folder on the bridge's machine, its games
+  read as boards - `Arkab.LiveChess`).
   """
-  def commands, do: ~w(rescan add_port forget_port forget_board resend record)
+  def commands, do: ~w(rescan add_port add_folder forget_port forget_board resend record)
 
-  @doc "The commands only a server joined as owner may give."
-  def owner_only, do: ~w(forget_port forget_board)
+  @doc """
+  The commands only a server joined as owner may give: forgetting, and
+  `add_folder`, which has the bridge read files on its own disk.
+  """
+  def owner_only, do: ~w(add_folder forget_port forget_board)
 
   # --- boards ------------------------------------------------------------------
 

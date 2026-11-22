@@ -20,10 +20,21 @@ defmodule Arkab.Bridge.Ports do
   played back (`%{"replay" => path, "name" => name, "speed" => n}`): the
   hall without the hall, for the tests and for trying a server out.
 
+  ## A LiveChess folder
+
+  `%{"folder" => path, "name" => name}`: the folder DGT LiveChess exports a
+  tournament to (`Arkab.LiveChess`). A watcher (`Arkab.LiveChess.Folder`)
+  says which games the round being played has, and each is a board,
+  `name#m` for `game-m.pgn` (`Arkab.Driver.LiveChess`). The next round with
+  more boards gets more boards here, and fewer fewer; board 3 of the next
+  round is the same board 3, with another game on it. `add_folder` names
+  it "LiveChess", or "LiveChess 2" when that name is taken.
+
   ## Board names
 
   `Arkab.Protocol.board_id/2`: the port for a single board, `port#address`
-  on a loop, the name for a replay. Alnasl makes its rows of them.
+  on a loop, the name for a replay, `name#m` for a LiveChess game. Alnasl
+  makes its rows of them.
   """
 
   use GenServer
@@ -32,6 +43,7 @@ defmodule Arkab.Bridge.Ports do
 
   alias Arkab.Bridge.{Board, Store}
   alias Arkab.Driver.{DgtBus, DgtSerial, Replay}
+  alias Arkab.LiveChess.Folder
   alias Arkab.Protocol
 
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -44,6 +56,9 @@ defmodule Arkab.Bridge.Ports do
 
   @doc "Reads `port` from now on, and after a restart."
   def add(source), do: GenServer.call(__MODULE__, {:add, source})
+
+  @doc "Reads a DGT LiveChess export folder from now on (`add_folder`, from the status page)."
+  def add_folder(folder), do: command(%{"cmd" => "add_folder", "folder" => folder}, true)
 
   @doc "A board answered on the loop of `port` that is not read. Called by the bus."
   def stranger(port, address), do: send(__MODULE__, {:stranger, port, address})
@@ -122,6 +137,33 @@ defmodule Arkab.Bridge.Ports do
     {:noreply, state}
   end
 
+  # The games of a LiveChess folder's round: a board for each, and none
+  # for a game the round no longer has.
+  def handle_info({:livechess_games, name, games}, state) do
+    case Enum.find(state.sources, &match?(%{"folder" => _, "name" => ^name}, &1)) do
+      nil ->
+        :ok
+
+      source ->
+        wanted = MapSet.new(games, &Protocol.board_id(name, &1))
+
+        for id <- Board.ids(),
+            elem(Protocol.parse_board_id(id), 0) == name,
+            not MapSet.member?(wanted, id),
+            do: stop_board(state, id)
+
+        for m <- games,
+            id = Protocol.board_id(name, m),
+            not MapSet.member?(state.forgotten, id),
+            Board.whereis(id) == nil,
+            do: start_game_board(state, source, m)
+
+        changed(state)
+    end
+
+    {:noreply, state}
+  end
+
   def handle_info(:boards_changed, state) do
     changed(state)
     {:noreply, state}
@@ -149,6 +191,21 @@ defmodule Arkab.Bridge.Ports do
 
   defp run("add_port", %{"port" => port}, state) when is_binary(port) and port != "",
     do: add_source(state, %{"port" => port})
+
+  defp run("add_folder", %{"folder" => folder}, state) when is_binary(folder) do
+    folder = String.trim(folder)
+
+    cond do
+      folder == "" or not File.dir?(folder) ->
+        {{:error, :no_such_folder}, state}
+
+      Enum.any?(state.sources, &(&1["folder"] == folder)) ->
+        {:ok, state}
+
+      true ->
+        add_source(state, %{"folder" => folder, "name" => folder_name(state.sources)})
+    end
+  end
 
   defp run("forget_port", %{"port" => port}, state) when is_binary(port) do
     {gone, kept} = Enum.split_with(state.sources, &(source_port(&1) == port))
@@ -198,6 +255,37 @@ defmodule Arkab.Bridge.Ports do
 
   defp source_port(%{"port" => port}), do: port
   defp source_port(%{"replay" => _path, "name" => name}), do: name
+  defp source_port(%{"folder" => _path, "name" => name}), do: name
+
+  defp folder_name(sources) do
+    taken = MapSet.new(sources, &source_port/1)
+
+    Stream.iterate(1, &(&1 + 1))
+    |> Stream.map(fn
+      1 -> "LiveChess"
+      n -> "LiveChess #{n}"
+    end)
+    |> Enum.find(&(not MapSet.member?(taken, &1)))
+  end
+
+  defp start_source(state, %{"folder" => folder, "name" => name}) do
+    spec =
+      {Folder, id: name, folder: folder, label: name, notify: self(), name: folder_via(name)}
+
+    case DynamicSupervisor.start_child(state.supervisor, spec) do
+      {:ok, pid} ->
+        {:ok, pid}
+
+      {:error, {:already_started, pid}} ->
+        # Ports restarted, the watcher did not: what it knows is told again.
+        send(self(), {:livechess_games, name, games_of(pid)})
+        {:ok, pid}
+
+      error ->
+        Logger.warning("arkab: folder #{folder} is not read: #{inspect(error)}")
+        error
+    end
+  end
 
   defp start_source(state, %{"replay" => path, "name" => name} = source) do
     options = %{"path" => path, "speed" => source["speed"] || 1}
@@ -221,6 +309,33 @@ defmodule Arkab.Bridge.Ports do
         driver_opts: transport(state, options: %{"clock" => true})
       )
     end
+  end
+
+  defp start_game_board(state, %{"folder" => folder, "name" => name}, m) do
+    watcher = folder_via(name)
+
+    start_board(state,
+      id: Protocol.board_id(name, m),
+      port: name,
+      address: m,
+      driver: Arkab.Driver.LiveChess,
+      resend_history: true,
+      driver_opts: [
+        options: %{"folder" => folder, "game" => m},
+        locate: fn -> Folder.path(watcher, m) end
+      ]
+    )
+  end
+
+  defp folder_via(name), do: {:via, Registry, {Arkab.Bridge.BoardRegistry, {:folder, name}}}
+
+  defp games_of(pid) do
+    case Folder.current(pid) do
+      %{games: games} -> games |> Map.keys() |> Enum.sort()
+      nil -> []
+    end
+  catch
+    :exit, _reason -> []
   end
 
   defp start_bus_board(state, port, address) do
@@ -257,7 +372,14 @@ defmodule Arkab.Bridge.Ports do
       stop_board(state, id)
     end
 
-    await_bus_gone(port)
+    if source["folder"], do: stop_watcher(state, port), else: await_bus_gone(port)
+  end
+
+  defp stop_watcher(state, name) do
+    case Registry.lookup(Arkab.Bridge.BoardRegistry, {:folder, name}) do
+      [{pid, _}] -> DynamicSupervisor.terminate_child(state.supervisor, pid)
+      [] -> :ok
+    end
   end
 
   # The loop's bus lets go of the port when its last board has gone, which
@@ -303,7 +425,8 @@ defmodule Arkab.Bridge.Ports do
       Enum.map(state.sources, fn source ->
         port = source_port(source)
         found = Enum.find(available, &(&1.port == port))
-        %{port: port, description: (found && found.description) || "", read?: true}
+        description = source["folder"] || (found && found.description) || ""
+        %{port: port, description: description, read?: true}
       end) ++
         for(
           found <- available,

@@ -15,6 +15,8 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+- [Feature] **A LiveChess board says who is playing.** Every game read from a LiveChess export folder now travels with its players (names, FIDE IDs, titles, ratings, federations, from the PGN's tags and the round's `index.json`), the LiveChess round and game number, the tournament's name, the result and any forfeit, as a new `game` event, sent when the board is met, whenever it changes, and on resend. Alnasl uses it to seat the board on its pairing; the bridge itself still has no idea who is winning and prefers it that way. DGT boards send nothing new.
+
 ## [0.7.2] - 2026-11-23
 
 - [Feature] **"Stop reading" beside a LiveChess folder on the status page.** Until now only Alnasl could let go of one, which is an odd place to keep the only off switch for something on this machine.

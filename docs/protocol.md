@@ -79,6 +79,16 @@ clock time written when the lever went over (`{"c": "white", "ms":
 `hist` drops it and acknowledges it like any other event, which is what an
 older Alnasl does; a server that does takes the whole history or none of it.
 
+Who is playing travels as `{"k": "game", "g": {...}}`, from a source that
+knows: a LiveChess export folder (`Arkab.LiveChess.facts/2`). It has the
+source (`"livechess"`), the tournament's name, the source's round and game
+number, `white` and `black` (each with what is known of `name`, `fide_id`,
+`title`, `rating`, `federation`), the game file's `result`, and a `forfeit`
+(`"white"`, `"black"` or `"both"`: who forfeited) when the round's index
+says so. Keys with nothing known are left out. It is sent when the board is
+met, again whenever it changes, and with `resend`. A DGT board never sends
+it. A server that does not know `game` drops it, as with `hist`.
+
 ### Delivery
 
 - The bridge writes every event to its SQLite queue before it sends it anywhere. A power cut loses what the board had not said yet, and nothing it had.

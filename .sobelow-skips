@@ -14,8 +14,9 @@ Traversal.FileModule: Directory Traversal in `File.open`,lib/arkab/launcher_deta
 Traversal.FileModule: Directory Traversal in `File.open`,lib/arkab/recorder.ex:126,5540A3C
 Traversal.FileModule: Directory Traversal in `File.open`,lib/arkab_web/pin.ex:230,7EBA066
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/capture.ex:63,2940F15
-Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/driver/live_chess.ex:119,188F11A
+Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/driver/live_chess.ex:126,68541FB
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/launcher_details/cli.ex:265,4413F15
+Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/live_chess.ex:391,32D9731
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/pin_request.ex:59,3AD70FD
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/pin_request.ex:66,11C0BBD
 Traversal.FileModule: Directory Traversal in `File.read`,lib/arkab/updates.ex:384,EBBAE1

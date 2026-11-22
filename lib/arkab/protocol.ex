@@ -190,7 +190,65 @@ defmodule Arkab.Protocol do
     %{"k" => "info", "i" => fields}
   end
 
+  def event_fields({:game, facts}) when is_map(facts),
+    do: %{"k" => "game", "g" => game_out(facts)}
+
   def event_fields(_other), do: nil
+
+  # Who is playing (`Arkab.LiveChess.facts/2`): only these names travel,
+  # and only with something in them.
+  @game_keys ~w(source tournament round game result forfeit)a
+  @game_names Map.new(@game_keys, &{to_string(&1), &1})
+  @player_keys ~w(name fide_id title rating federation)a
+  @player_names Map.new(@player_keys, &{to_string(&1), &1})
+  @forfeits ~w(white black both)
+
+  defp game_out(facts) do
+    plain = for {k, v} <- facts, k in @game_keys, v != nil, into: %{}, do: {to_string(k), v}
+
+    sides =
+      for side <- [:white, :black],
+          %{} = player <- [facts[side]],
+          into: %{},
+          do: {to_string(side), player_out(player)}
+
+    plain |> Map.merge(sides) |> Map.reject(fn {_k, v} -> v == %{} end)
+  end
+
+  defp player_out(player),
+    do: for({k, v} <- player, k in @player_keys, v != nil, into: %{}, do: {to_string(k), v})
+
+  defp game_in(fields) do
+    plain =
+      for {k, v} <- fields,
+          is_map_key(@game_names, k),
+          game_value?(@game_names[k], v),
+          into: %{},
+          do: {@game_names[k], v}
+
+    sides =
+      for {name, side} <- [{"white", :white}, {"black", :black}],
+          %{} = player <- [fields[name]],
+          into: %{},
+          do: {side, player_in(player)}
+
+    Map.merge(plain, sides)
+  end
+
+  defp player_in(player) do
+    for {k, v} <- player,
+        is_map_key(@player_names, k),
+        player_value?(@player_names[k], v),
+        into: %{},
+        do: {@player_names[k], v}
+  end
+
+  defp game_value?(key, v) when key in [:round, :game], do: is_integer(v) and v > 0
+  defp game_value?(:forfeit, v), do: v in @forfeits
+  defp game_value?(_key, v), do: is_binary(v)
+
+  defp player_value?(key, v) when key in [:fide_id, :rating], do: is_integer(v) and v > 0
+  defp player_value?(_key, v), do: is_binary(v)
 
   # The marks a board writes in its memory (`Arkab.Dgt.Bus.changes/1`),
   # by name. Nothing else travels.
@@ -286,6 +344,9 @@ defmodule Arkab.Protocol do
       events -> {:ok, {:history, Enum.reverse(events)}}
     end
   end
+
+  defp event(%{"k" => "game", "g" => fields}) when is_map(fields),
+    do: {:ok, {:game, game_in(fields)}}
 
   defp event(_other), do: :error
 

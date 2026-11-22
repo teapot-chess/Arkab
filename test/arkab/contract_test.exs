@@ -125,7 +125,19 @@ defmodule Arkab.ContractTest do
            :start_position_rotated,
            :end_of_data
          ]},
-        {:history, []}
+        {:history, []},
+        {:game,
+         %{
+           source: "livechess",
+           tournament: "Open of Nowhere",
+           round: 2,
+           game: 7,
+           white: %{name: "Vermeulen, Wanda", fide_id: 9_990_001, title: "WFM", rating: 2104},
+           black: %{name: "Otto Brask", federation: "NED"},
+           result: "1-0",
+           forfeit: "black"
+         }},
+        {:game, %{source: "livechess", white: %{}, result: "*"}}
       ]
 
       encoded =

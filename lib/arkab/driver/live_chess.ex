@@ -15,7 +15,8 @@ defmodule Arkab.Driver.LiveChess do
   ## What is sent
 
   - The first time the file reads as a game (and again after it was gone):
-    `:connected`, then the game so far as the board's memory
+    `:connected`, then who is playing (`{:game, facts}`,
+    `Arkab.LiveChess.facts/2`), then the game so far as the board's memory
     (`{:history, events}`, `Arkab.LiveChess.history/1`), then the position
     and clock as they stand. Alnasl holds the game it has up against the
     memory, so a game that was under way before the bridge looked is
@@ -36,6 +37,8 @@ defmodule Arkab.Driver.LiveChess do
     game goes on the clock again, the side to move's time counting down
     from its last `[%clk]`. The file says the time after each move; what
     a clock shows between moves is that, less the time since.
+  - `{:game, facts}` again whenever the facts change: a forfeit or a name
+    put right in the round's `index.json`, a result, the next round.
   - The file gone (or the round has no such board): `:disconnected`.
 
   A file read while LiveChess was still writing it (no result token at
@@ -91,7 +94,11 @@ defmodule Arkab.Driver.LiveChess do
       # Since when the side to move has been thinking (wall clock, ms).
       since: nil,
       # A file that could not be played, said once: {path, mtime, hash}.
-      bad: nil
+      bad: nil,
+      # Who is playing (`LiveChess.facts/2`) as last sent, and the files
+      # it was read from as they were then: {seen, index mtime, tournament mtime}.
+      facts: nil,
+      facts_from: nil
     }
 
     send(self(), :tick)
@@ -104,7 +111,7 @@ defmodule Arkab.Driver.LiveChess do
   @impl true
   def handle_info(:tick, state) do
     Process.send_after(self(), :tick, state.tick)
-    {:noreply, state |> read() |> heartbeat()}
+    {:noreply, state |> read() |> facts() |> heartbeat()}
   end
 
   def handle_info(:step, state), do: {:noreply, step(%{state | stepping?: false})}
@@ -155,13 +162,18 @@ defmodule Arkab.Driver.LiveChess do
 
   defp gone(state) do
     emit(state, :disconnected)
-    %{state | connected?: false, seen: nil, path: nil, game: nil, sent: 0}
+    %{state | connected?: false, seen: nil, path: nil, game: nil, sent: 0, facts_from: nil}
   end
 
   # A game read for the first time since the board came: its memory, then
   # where it stands.
   defp take(%{connected?: false} = state, path, game, seen) do
     emit(state, :connected)
+    # Who is playing before what was played: Alnasl puts the board on its
+    # pairing, and the memory is the game of that pairing.
+    state =
+      state |> Map.merge(%{connected?: true, path: path, seen: seen, game: game}) |> facts(true)
+
     emit(state, {:history, LiveChess.history(game)})
     last = length(game.plies) - 1
     emit(state, {:position, Enum.at(game.plies, last).board})
@@ -200,6 +212,33 @@ defmodule Arkab.Driver.LiveChess do
   end
 
   defp mtime_ms({_path, mtime, _size}), do: mtime * 1000
+
+  # --- who is playing ----------------------------------------------------------------
+
+  # The facts are read again when the game file, the round's index or the
+  # tournament's file changed, and sent when they say something new: a
+  # forfeit in the index, a name put right, the next round's players.
+  # `force?`: sent whatever was sent before (a board that came back).
+  defp facts(state, force? \\ false)
+
+  defp facts(%{connected?: true, game: game, path: path} = state, force?) when game != nil do
+    from = {state.seen, index_mtime(path), tournament_mtime(path)}
+
+    if from == state.facts_from and not force? do
+      state
+    else
+      facts = LiveChess.facts(path, game)
+      if facts != state.facts or force?, do: emit(state, {:game, facts})
+      %{state | facts: facts, facts_from: from}
+    end
+  end
+
+  defp facts(state, _force?), do: state
+
+  defp index_mtime(path), do: LiveChess.mtime(Path.join(Path.dirname(path), "index.json"))
+
+  defp tournament_mtime(path),
+    do: LiveChess.mtime(Path.join(Path.dirname(Path.dirname(path)), "tournament.json"))
 
   # --- sending ---------------------------------------------------------------------
 

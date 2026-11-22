@@ -158,7 +158,9 @@ defmodule Arkab.BridgeLiveChessTest do
     eventually(fn -> Board.ids() == ~w(LiveChess#4) end)
   end
 
-  test "the game's memory is sent again with the rest of the board", %{tournament: t} do
+  test "who is playing and the game's memory are sent again with the rest of the board", %{
+    tournament: t
+  } do
     path = LiveChessFolder.round(t, 1, [{1, @game}]) |> Path.join("game-1.pgn")
 
     start_supervised!({Registry, keys: :unique, name: Arkab.Bridge.BoardRegistry})
@@ -184,7 +186,7 @@ defmodule Arkab.BridgeLiveChessTest do
     assert :ok = GenServer.call(board, :resend)
     kinds = drain([])
     # A clock tick of the driver may come first; the resend is in order.
-    assert ["st", "hist" | _] = Enum.drop_while(kinds, &(&1 != "st"))
+    assert ["st", "game", "hist" | _] = Enum.drop_while(kinds, &(&1 != "st"))
     assert "pos" in kinds and "clk" in kinds
   end
 

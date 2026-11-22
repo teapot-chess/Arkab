@@ -14,6 +14,7 @@ defmodule Arkab.Driver do
   | `{:poll, :ok \\| :missed}` | one question to the board was answered / was not - the signal quality |
   | `{:raw, :rx \\| :tx, binary}` | the bytes on the wire, for the capture file |
   | `{:history, events}` | what the board wrote down in its own memory, read back when it is met, comes back, or says it was switched on: `Arkab.Dgt.Bus.history/1`, oldest first. Not news: what went on while nobody was reading the board, for whoever keeps the game to compare with what it has (Alnasl's `Alnasl.BoardHistory`) |
+  | `{:game, facts}` | who is playing, from a driver that knows (`Arkab.Driver.LiveChess`: `Arkab.LiveChess.facts/2`): the players, the source's round and game number, the result, a forfeit. A DGT board never says it |
 
   A driver that plays recorded or simulated time wraps each event as
   `{:at, t_ms, speed, next_t_ms, event}`; see `Arkab.Driver.Player`.

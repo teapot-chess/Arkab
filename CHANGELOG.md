@@ -15,8 +15,11 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-22
+
 - [Feature] **DGT LiveChess as a source of boards.** Point the bridge at the folder LiveChess's filesystem exporter writes to ("LiveChess export folder" on the status page, or `add_folder` from the owner server) and every game of the round being played turns up as a board, `LiveChess#M`, positions and clocks out of the PGN files, the next round's games on the same boards. A game the bridge meets halfway through is handed over as the board's memory, so Alnasl catches up without guessing; a file caught mid-write is simply read again a second later, since being patient is cheaper than being wrong about `O-O-O`. Arkab learned just enough chess for this (`Arkab.Chess`, `Arkab.Pgn`, copied from Alnasl), and still has opinions about none of it.
 - [Fix] **Serial ports on an older Mac.** The Mac builds promise macOS 10.13 (Intel) and 11 (Apple Silicon), but the serial program asked IOKit for a value that only exists from macOS 12, and died the moment it was asked for the ports: "no serial devices found" on a 10.14 MacBook. It now asks the way every macOS understands.
+
 ## [0.6.1] - 2026-11-21
 
 - [Fix] **An old wooden board on a loop answers in full again.** Arkab now leaves DTR off and RTS on after opening a port, which is where DGT's own LiveChess ends up a second after it opens one. With DTR on as well, a firmware 1.9 board cut every whole-board answer short after a dozen bytes (0 of 15 complete, 15 of 15 with DTR off); the 4.2 boards on the same loop did not care either way.

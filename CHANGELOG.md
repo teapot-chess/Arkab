@@ -15,6 +15,8 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-11-23
+
 - [Feature] **"Stop reading" beside a LiveChess folder on the status page.** Until now only Alnasl could let go of one, which is an odd place to keep the only off switch for something on this machine.
 - [Fix] **A board put away stays away only until you ask for its source again.** Put away LiveChess board 1 and game 1 of every later round was put away with it, because it is board 1 again; entering the folder a second time did nothing at all. Now asking for the folder again brings its boards back, and removing a source forgets what was put away of it as well, so the next time starts clean.
 

@@ -57,6 +57,9 @@ defmodule Arkab.Bridge.Ports do
   @doc "Reads `port` from now on, and after a restart."
   def add(source), do: GenServer.call(__MODULE__, {:add, source})
 
+  @doc "The names of the LiveChess folders being read (`LiveChess`, `LiveChess 2`, ...)."
+  def folders, do: for(%{"folder" => _, "name" => name} <- Store.get("ports") || [], do: name)
+
   @doc "Reads a DGT LiveChess export folder from now on (`add_folder`, from the status page)."
   def add_folder(folder), do: command(%{"cmd" => "add_folder", "folder" => folder}, true)
 

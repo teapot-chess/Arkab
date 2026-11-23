@@ -191,8 +191,10 @@ defmodule Arkab.BridgeTest do
     eventually(fn -> Enum.all?(Bridge.status().boards, & &1.connected?) end, 15_000)
     assert ids.() == both
 
-    old = Enum.find(Bridge.status().boards, &(&1.id == "FAKE-BR2#6310"))
-    assert old.info.serial == "06310"
+    old = fn -> Enum.find(Bridge.status().boards, &(&1.id == "FAKE-BR2#6310")) end
+    # Connected comes a moment before the board has said who it is.
+    eventually(fn -> old.().info[:serial] == "06310" end, 15_000)
+    old = old.()
     assert old.address == 6310
   end
 

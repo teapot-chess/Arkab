@@ -22,7 +22,7 @@ defmodule ArkabWeb.StatusLive do
   alias Phoenix.LiveView.JS
 
   # Everything that changes something. The rest of the events are none.
-  @changing ~w(join update later update_check check_now autostart remove add_folder)
+  @changing ~w(join update later update_check check_now autostart remove add_folder forget_folder)
   # The PIN's own: this machine only, a grant is not enough.
   @local_only ~w(pin_set pin_new pin_notice_ok help upgrade_open upgrade_cancel upgrade switch_open switch_cancel switch)
 
@@ -138,6 +138,15 @@ defmodule ArkabWeb.StatusLive do
       end
 
     {:noreply, socket |> assign(folder_message: message) |> load()}
+  end
+
+  # Stops reading a LiveChess folder; its boards go with it, and come back clean
+  # when the folder is entered again.
+  defp change("forget_folder", %{"port" => port}, socket) do
+    if port in folders(),
+      do: Arkab.Bridge.Ports.command(%{"cmd" => "forget_port", "port" => port}, true)
+
+    {:noreply, load(socket)}
   end
 
   defp change("remove", %{"id" => id}, socket) do
@@ -309,6 +318,12 @@ defmodule ArkabWeb.StatusLive do
   defp words(:elsewhere, locale), do: Words.t(locale, :err_elsewhere)
   defp words(_other, locale), do: Words.t(locale, :err_other)
 
+  defp folders do
+    Arkab.Bridge.Ports.folders()
+  rescue
+    _error -> []
+  end
+
   defp load(socket) do
     status =
       try do
@@ -328,6 +343,7 @@ defmodule ArkabWeb.StatusLive do
 
     assign(socket,
       status: status,
+      folders: folders(),
       notice: Updates.notice(),
       install_kind: Updates.install_kind(),
       update_mode: Updates.mode(),
@@ -554,6 +570,16 @@ defmodule ArkabWeb.StatusLive do
           <li :for={port <- @status.ports} id={"port-#{port.port}"}>
             <span class="mono">{port.port}</span> <span class="note">{port.description}</span>
             <span :if={!port.read?} class="note">{Words.t(@locale, :not_read)}</span>
+            <button
+              :if={@may_change? and port.port in @folders}
+              id={"stop-folder-#{port.port}"}
+              type="button"
+              phx-click="forget_folder"
+              phx-value-port={port.port}
+              data-confirm={Words.t(@locale, :folder_stop_confirm)}
+            >
+              {Words.t(@locale, :folder_stop)}
+            </button>
             <ul>
               <li
                 :for={board <- Enum.filter(@status.boards, &(&1.port == port.port))}

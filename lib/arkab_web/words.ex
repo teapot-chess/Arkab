@@ -41,6 +41,9 @@ defmodule ArkabWeb.Words do
       folder_placeholder: "C:\\Users\\you\\Documents\\LiveChess export",
       folder_add: "Read folder",
       folder_added: "Read. Its games show up as boards within a second or two.",
+      folder_stop: "Stop reading",
+      folder_stop_confirm:
+        "Stop reading this folder? Its boards go; enter the folder again to bring them back.",
       folder_missing: "That is not a folder on this machine.",
       folder_hint:
         "For a hall that runs DGT LiveChess: switch on its filesystem export, and give the folder it writes to here. Every game of the round being played becomes a board, as if it were plugged in.",
@@ -194,6 +197,9 @@ defmodule ArkabWeb.Words do
       folder_placeholder: "C:\\Users\\jij\\Documents\\LiveChess export",
       folder_add: "Map lezen",
       folder_added: "Wordt gelezen. De partijen verschijnen binnen een paar seconden als borden.",
+      folder_stop: "Niet meer lezen",
+      folder_stop_confirm:
+        "Deze map niet meer lezen? De borden verdwijnen; geef de map opnieuw op om ze terug te krijgen.",
       folder_missing: "Dat is geen map op deze computer.",
       folder_hint:
         "Voor een zaal die DGT LiveChess gebruikt: zet daar de export naar het bestandssysteem aan en geef hier de map op waarin het schrijft. Elke partij van de ronde die gespeeld wordt, wordt een bord, alsof het aangesloten was.",

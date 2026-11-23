@@ -57,6 +57,9 @@ defmodule Arkab.Bridge.Ports do
   @doc "Reads `port` from now on, and after a restart."
   def add(source), do: GenServer.call(__MODULE__, {:add, source})
 
+  @doc "The names of the LiveChess folders being read (`LiveChess`, `LiveChess 2`, ...)."
+  def folders, do: for(%{"folder" => _, "name" => name} <- Store.get("ports") || [], do: name)
+
   @doc "Reads a DGT LiveChess export folder from now on (`add_folder`, from the status page)."
   def add_folder(folder), do: command(%{"cmd" => "add_folder", "folder" => folder}, true)
 
@@ -200,7 +203,17 @@ defmodule Arkab.Bridge.Ports do
       folder == "" or not File.dir?(folder) ->
         {{:error, :no_such_folder}, state}
 
-      Enum.any?(state.sources, &(same_source(&1) == {:folder, folder_key(folder)})) ->
+      source = Enum.find(state.sources, &(same_source(&1) == {:folder, folder_key(folder)})) ->
+        # Asked for again: what was forgotten of it is welcome back, or the
+        # owner has no way left to see game 1 once board 1 was put away.
+        state = welcome_back(state, source_port(source))
+
+        case Registry.lookup(Arkab.Bridge.BoardRegistry, {:folder, source["name"]}) do
+          [{pid, _}] -> send(self(), {:livechess_games, source["name"], games_of(pid)})
+          [] -> start_source(state, source)
+        end
+
+        changed(state)
         {:ok, state}
 
       true ->
@@ -213,6 +226,7 @@ defmodule Arkab.Bridge.Ports do
     for source <- gone, do: stop_source(state, source)
     Store.put("ports", kept)
     state = %{state | sources: kept}
+    state = if gone == [], do: state, else: welcome_back(state, port)
     changed(state)
     {if(gone == [], do: {:error, :no_such_port}, else: :ok), state}
   end
@@ -243,9 +257,7 @@ defmodule Arkab.Bridge.Ports do
       sources = state.sources ++ [source]
       Store.put("ports", sources)
       # A port read again is a port whose boards are welcome again.
-      forgotten = MapSet.reject(state.forgotten, &(elem(Protocol.parse_board_id(&1), 0) == port))
-      Store.put("forgotten", MapSet.to_list(forgotten))
-      state = %{state | sources: sources, forgotten: forgotten}
+      state = welcome_back(%{state | sources: sources}, port)
       start_source(state, source)
       changed(state)
       {:ok, state}
@@ -272,6 +284,13 @@ defmodule Arkab.Bridge.Ports do
       |> String.trim_trailing("/")
 
     if os == {:unix, :linux}, do: key, else: String.downcase(key)
+  end
+
+  # The boards of `port` that were put away are no longer remembered as such.
+  defp welcome_back(state, port) do
+    forgotten = MapSet.reject(state.forgotten, &(elem(Protocol.parse_board_id(&1), 0) == port))
+    if forgotten != state.forgotten, do: Store.put("forgotten", MapSet.to_list(forgotten))
+    %{state | forgotten: forgotten}
   end
 
   defp same_source(%{"folder" => path}), do: {:folder, folder_key(path)}

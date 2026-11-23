@@ -118,6 +118,29 @@ defmodule Arkab.BridgeLiveChessTest do
              Ports.folder_key("/home/x/lc", {:unix, :linux})
   end
 
+  test "a put-away game board comes back when the folder is asked for again", %{
+    dir: dir,
+    folder: folder,
+    tournament: t
+  } do
+    LiveChessFolder.round(t, 1, [{1, @game}, {2, @game}])
+    start_bridge(dir, [%{"folder" => folder, "name" => "LiveChess"}])
+    eventually(fn -> Board.ids() == ~w(LiveChess#1 LiveChess#2) end)
+
+    for id <- ~w(LiveChess#1 LiveChess#2),
+        do: assert(:ok = Ports.command(%{"cmd" => "forget_board", "board" => id}, true))
+
+    eventually(fn -> Board.ids() == [] end)
+    assert :ok = Ports.add_folder(folder)
+    eventually(fn -> Board.ids() == ~w(LiveChess#1 LiveChess#2) end)
+    assert Store.get("forgotten") == []
+
+    # Removing the source forgets what was put away of it, too.
+    assert :ok = Ports.command(%{"cmd" => "forget_board", "board" => "LiveChess#2"}, true)
+    assert :ok = Ports.command(%{"cmd" => "forget_port", "port" => "LiveChess"}, true)
+    assert Store.get("forgotten") == []
+  end
+
   test "a folder stored twice by an older version is read once", %{
     dir: dir,
     folder: folder,

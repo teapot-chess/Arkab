@@ -66,6 +66,11 @@ defmodule ArkabWeb.StatusLiveTest do
     assert has_element?(view, "#folder-message.ok")
     assert has_element?(view, "#port-list li", "LiveChess")
     assert [%{"folder" => ^folder, "name" => "LiveChess"}] = Arkab.Bridge.Store.get("ports")
+
+    # And stopped from the page, too.
+    view |> element("#stop-folder-LiveChess") |> render_click()
+    refute has_element?(view, "#stop-folder-LiveChess")
+    assert Arkab.Bridge.Store.get("ports") == []
   end
 
   test "a newer version is offered, with its size, and Later puts it away" do

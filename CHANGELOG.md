@@ -15,6 +15,8 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-23
+
 - [Fix] **One LiveChess folder is one source, however it is typed.** `C:\users\…` and `C:\Users\…\` are the same folder to Windows and macOS, but not to a string comparison, so the second spelling was read as a second tournament and every game turned up twice, as LiveChess and LiveChess 2. Names are now compared the way the system compares them (case counts on Linux only), and a list saved with the duplicate already in it is read once.
 - [Fix] **The example under "LiveChess export folder" has its backslashes back.** It read `C:UsersyouDocuments…`, a path that exists nowhere, because Elixir quietly ate them.
 

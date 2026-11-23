@@ -83,6 +83,10 @@ defmodule Arkab.BridgeLiveChessTest do
     assert :ok = Ports.add_folder(folder)
     # The same folder twice is one source.
     assert :ok = Ports.add_folder(folder <> " ")
+    assert :ok = Ports.add_folder(folder <> "/")
+
+    if match?({:win32, _}, :os.type()),
+      do: assert(:ok = Ports.add_folder(String.upcase(String.replace(folder, "/", "\\"))))
 
     assert [%{"folder" => ^folder, "name" => "LiveChess"}] = Store.get("ports")
     eventually(fn -> Board.ids() == ~w(LiveChess#4) end)
@@ -96,6 +100,39 @@ defmodule Arkab.BridgeLiveChessTest do
     assert :ok = Ports.command(%{"cmd" => "forget_port", "port" => "LiveChess"}, true)
     eventually(fn -> Board.ids() == [] end)
     assert [%{"name" => "LiveChess 2"}] = Store.get("ports")
+  end
+
+  test "folder_key: one folder however it is typed; case counts on Linux only" do
+    win = {:win32, :nt}
+
+    assert Ports.folder_key("C:\\users\\jorian\\lchess", win) ==
+             Ports.folder_key("C:\\Users\\jorian\\lchess\\", win)
+
+    assert Ports.folder_key("/Users/x/LC", {:unix, :darwin}) ==
+             Ports.folder_key("/users/x/lc/", {:unix, :darwin})
+
+    refute Ports.folder_key("/home/x/LC", {:unix, :linux}) ==
+             Ports.folder_key("/home/x/lc", {:unix, :linux})
+
+    assert Ports.folder_key("/home/x/lc/", {:unix, :linux}) ==
+             Ports.folder_key("/home/x/lc", {:unix, :linux})
+  end
+
+  test "a folder stored twice by an older version is read once", %{
+    dir: dir,
+    folder: folder,
+    tournament: t
+  } do
+    LiveChessFolder.round(t, 1, [{4, @game}])
+    upper = if match?({:unix, :linux}, :os.type()), do: folder, else: String.upcase(folder)
+
+    start_bridge(dir, [
+      %{"folder" => folder, "name" => "LiveChess"},
+      %{"folder" => upper <> "/", "name" => "LiveChess 2"}
+    ])
+
+    assert [%{"name" => "LiveChess"}] = Store.get("ports")
+    eventually(fn -> Board.ids() == ~w(LiveChess#4) end)
   end
 
   test "the game's memory is sent again with the rest of the board", %{tournament: t} do

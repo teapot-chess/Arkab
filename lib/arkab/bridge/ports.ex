@@ -75,6 +75,7 @@ defmodule Arkab.Bridge.Ports do
         {:ok, given} -> given
         :error -> stored || []
       end
+      |> Enum.uniq_by(&same_source/1)
 
     if sources != stored, do: Store.put("ports", sources)
 
@@ -199,7 +200,7 @@ defmodule Arkab.Bridge.Ports do
       folder == "" or not File.dir?(folder) ->
         {{:error, :no_such_folder}, state}
 
-      Enum.any?(state.sources, &(&1["folder"] == folder)) ->
+      Enum.any?(state.sources, &(same_source(&1) == {:folder, folder_key(folder)})) ->
         {:ok, state}
 
       true ->
@@ -256,6 +257,25 @@ defmodule Arkab.Bridge.Ports do
   defp source_port(%{"port" => port}), do: port
   defp source_port(%{"replay" => _path, "name" => name}), do: name
   defp source_port(%{"folder" => _path, "name" => name}), do: name
+
+  @doc """
+  One folder, however it was typed: `C:\\users\\x` and `C:\\Users\\x\\` are
+  the same folder to Windows (and to macOS, case-insensitive out of the box),
+  and reading it twice gave every game two boards. Linux keeps case apart.
+  """
+  def folder_key(path, os \\ :os.type()) do
+    key =
+      path
+      |> String.trim()
+      |> String.replace("\\", "/")
+      |> Path.expand()
+      |> String.trim_trailing("/")
+
+    if os == {:unix, :linux}, do: key, else: String.downcase(key)
+  end
+
+  defp same_source(%{"folder" => path}), do: {:folder, folder_key(path)}
+  defp same_source(source), do: {:port, source_port(source)}
 
   defp folder_name(sources) do
     taken = MapSet.new(sources, &source_port/1)

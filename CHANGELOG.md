@@ -15,6 +15,9 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+- [Fix] **One LiveChess folder is one source, however it is typed.** `C:\users\…` and `C:\Users\…\` are the same folder to Windows and macOS, but not to a string comparison, so the second spelling was read as a second tournament and every game turned up twice, as LiveChess and LiveChess 2. Names are now compared the way the system compares them (case counts on Linux only), and a list saved with the duplicate already in it is read once.
+- [Fix] **The example under "LiveChess export folder" has its backslashes back.** It read `C:UsersyouDocuments…`, a path that exists nowhere, because Elixir quietly ate them.
+
 ## [0.7.0] - 2026-11-22
 
 - [Feature] **DGT LiveChess as a source of boards.** Point the bridge at the folder LiveChess's filesystem exporter writes to ("LiveChess export folder" on the status page, or `add_folder` from the owner server) and every game of the round being played turns up as a board, `LiveChess#M`, positions and clocks out of the PGN files, the next round's games on the same boards. A game the bridge meets halfway through is handed over as the board's memory, so Alnasl catches up without guessing; a file caught mid-write is simply read again a second later, since being patient is cheaper than being wrong about `O-O-O`. Arkab learned just enough chess for this (`Arkab.Chess`, `Arkab.Pgn`, copied from Alnasl), and still has opinions about none of it.

@@ -424,6 +424,7 @@ defmodule Arkab.LiveChess do
   end
 
   # Small files only: a tournament's index is a few kilobytes.
+  # sobelow_skip ["Traversal.FileModule"]
   defp json(path) do
     with {:ok, %{size: size}} when size <= 1_000_000 <- File.stat(path),
          {:ok, text} <- File.read(path),

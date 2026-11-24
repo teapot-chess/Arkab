@@ -63,7 +63,7 @@ jobs:
           mix hex.audit
 
       - name: Sobelow
-        # Findings reviewed in context live in .sobelow-skips; a NEW finding fails here.
+        # Reviewed findings are skipped inline (sobelow_skip) or ignored in .sobelow-conf; a NEW finding fails here.
         run: mix sobelow --config
 
       - name: Check formatting

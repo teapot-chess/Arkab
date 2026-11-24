@@ -222,6 +222,7 @@ defmodule ArkabWeb.Pin do
   # place; the rename replaces whatever stands at `access-pin`, a symlink
   # included, without following it. On Windows chmod does nothing and the
   # profile folder's own rights do the job.
+  # sobelow_skip ["Traversal.FileModule"]
   defp write_file(dir, pin) do
     path = Path.join(dir, @file_name)
     tmp = path <> ".new"
@@ -241,6 +242,7 @@ defmodule ArkabWeb.Pin do
   end
 
   # Only a regular file, and only a valid PIN; anything else is no PIN.
+  # sobelow_skip ["Traversal.FileModule"]
   defp read_file(dir) do
     path = Path.join(dir, @file_name)
 

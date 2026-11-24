@@ -28,6 +28,7 @@ defmodule Arkab.Bridge do
   def start_link(opts), do: Supervisor.start_link(__MODULE__, opts, name: __MODULE__)
 
   @impl true
+  # sobelow_skip ["Traversal.FileModule"]
   def init(opts) do
     data = Keyword.fetch!(opts, :data_dir)
     File.mkdir_p!(data)

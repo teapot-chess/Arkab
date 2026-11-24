@@ -127,6 +127,7 @@ defmodule Arkab.LauncherDetails do
   def handle_info(_other, state), do: {:noreply, state}
 
   @impl true
+  # sobelow_skip ["Traversal.FileModule"]
   def terminate(_reason, %{local?: true} = state) do
     if state.token_file, do: File.rm(state.token_file)
     # At shutdown the application controller is busy stopping us and will
@@ -147,6 +148,7 @@ defmodule Arkab.LauncherDetails do
 
   defp write_token(nil, _token, _port), do: nil
 
+  # sobelow_skip ["Traversal.FileModule"]
   defp write_token(dir, token, port) do
     run = Path.join(dir, "run")
     file = token_file(dir)

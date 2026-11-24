@@ -15,6 +15,9 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+- [Change] **Sobelow skips now live next to the code they excuse.** The reviewed findings used to be line-number fingerprints in `.sobelow-skips`, which an innocent edit above a finding could unsuppress, usually on a Friday. Each one is now an inline `# sobelow_skip` comment above its function, the fingerprint file is gone, and the three `Config.*` checks Sobelow cannot take inline are ignored by name in `.sobelow-conf` with the reasoning written down. Same findings suppressed, nothing new hidden.
+- [Change] **`.gitattributes` knows the binary files and the Windows scripts.** Images, fonts, archives and databases are marked binary so line-ending normalisation leaves them be, and `.ps1` and `.cmd` files keep CRLF like the `.bat` files already did.
+
 ## [0.7.3] - 2026-11-24
 
 - [Fix] **A LiveChess board with no game yet shows the starting position, not an empty board.** An empty `game-M.pgn`, one with tag pairs and nothing after them, or one set up on an e-board nobody had put the pieces on yet was either never read ("half a file", for ever) or refused as an impossible position, and the board sat there in Alnasl with no pieces at all, which looks less like "waiting for a game" and more like a robbery. Such a board now comes up at the starting position, says `no_game` with whatever players the round's index already knows, and shows "no game in LiveChess yet" on the status page. When the game turns up it is sent as on first sight, memory and all. A file that held a game and reads empty for a moment is LiveChess rewriting it, and is left alone until it has finished.

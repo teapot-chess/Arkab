@@ -118,6 +118,7 @@ defmodule Arkab.Recorder do
   defp root(%{root: fun}) when is_function(fun, 0), do: fun.()
   defp root(%{root: root}) when is_binary(root), do: root
 
+  # sobelow_skip ["Traversal.FileModule"]
   defp open(state, board_id) do
     dir = Path.join(root(state), "board-#{dir_name(board_id)}")
     File.mkdir_p!(dir)
@@ -139,6 +140,7 @@ defmodule Arkab.Recorder do
   end
 
   # The cap is on everything together; the oldest file goes first.
+  # sobelow_skip ["Traversal.FileModule"]
   defp enforce_cap(%{dir: nil, cap: cap} = state) when is_function(cap, 0) do
     cap = cap.()
     files = Enum.reverse(files(root(state)))

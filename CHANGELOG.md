@@ -15,6 +15,9 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-11-24
+
+- [Fix] **A LiveChess board sent again carries the game it is on, not the one it started with.** When a server asked for the whole board again (it came up, or its board process restarted), the bridge sent the board's memory as it had read it on first sight, which after the next round is another pair's game: a server whose new game was still at move zero would have taken the old game's moves as its own. The memory now comes from the board as it stands, up to the last position sent, and a board still waiting for its game sends just the starting position.
 - [Change] **Sobelow skips now live next to the code they excuse.** The reviewed findings used to be line-number fingerprints in `.sobelow-skips`, which an innocent edit above a finding could unsuppress, usually on a Friday. Each one is now an inline `# sobelow_skip` comment above its function, the fingerprint file is gone, and the three `Config.*` checks Sobelow cannot take inline are ignored by name in `.sobelow-conf` with the reasoning written down. Same findings suppressed, nothing new hidden.
 - [Change] **`.gitattributes` knows the binary files and the Windows scripts.** Images, fonts, archives and databases are marked binary so line-ending normalisation leaves them be, and `.ps1` and `.cmd` files keep CRLF like the `.bat` files already did.
 

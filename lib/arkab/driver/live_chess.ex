@@ -40,6 +40,14 @@ defmodule Arkab.Driver.LiveChess do
   - `{:game, facts}` again whenever the facts change: a forfeit or a name
     put right in the round's `index.json`, a result, the next round.
   - The file gone (or the round has no such board): `:disconnected`.
+  - A file with no game in it yet (`{:error, :no_game}`: empty, tags only,
+    an empty e-board): `:connected`, who is playing as far as the round's
+    index knows, with `no_game: true`, and the starting position - not an
+    empty board, which is what a board with no game looked like until
+    0.7.3. The game that turns up in the file later is sent as on first
+    sight: who is playing, the memory, where it stands. A file that held
+    a game and reads empty for a moment is LiveChess rewriting it, and is
+    read again on the next tick, like half a file.
 
   A file read while LiveChess was still writing it (no result token at
   the end: `Arkab.Pgn`) is read again on the next tick. A file whose
@@ -98,7 +106,9 @@ defmodule Arkab.Driver.LiveChess do
       # Who is playing (`LiveChess.facts/2`) as last sent, and the files
       # it was read from as they were then: {seen, index mtime, tournament mtime}.
       facts: nil,
-      facts_from: nil
+      facts_from: nil,
+      # The file has no game yet: the starting position was sent instead.
+      no_game?: false
     }
 
     send(self(), :tick)
@@ -147,6 +157,13 @@ defmodule Arkab.Driver.LiveChess do
       {:error, :partial} ->
         state
 
+      # The same file had a game a second ago: LiveChess is rewriting it.
+      {:error, :no_game} when path == state.path and not state.no_game? and state.game != nil ->
+        state
+
+      {:error, :no_game} ->
+        waiting(state, path, seen)
+
       {:error, why} ->
         Logger.warning(
           "arkab: #{state.id}: #{Path.basename(path)} cannot be read: #{describe(why)}"
@@ -162,13 +179,51 @@ defmodule Arkab.Driver.LiveChess do
 
   defp gone(state) do
     emit(state, :disconnected)
-    %{state | connected?: false, seen: nil, path: nil, game: nil, sent: 0, facts_from: nil}
+
+    %{
+      state
+      | connected?: false,
+        seen: nil,
+        path: nil,
+        game: nil,
+        sent: 0,
+        facts_from: nil,
+        no_game?: false
+    }
   end
 
-  # A game read for the first time since the board came: its memory, then
-  # where it stands.
-  defp take(%{connected?: false} = state, path, game, seen) do
-    emit(state, :connected)
+  # No game in the file yet: the board is there, at the starting position,
+  # and says so. Players from the index, when it has them.
+  defp waiting(%{no_game?: true, path: path} = state, path, seen), do: %{state | seen: seen}
+
+  defp waiting(state, path, seen) do
+    if not state.connected?, do: emit(state, :connected)
+    game = LiveChess.no_game()
+
+    state =
+      %{
+        state
+        | connected?: true,
+          path: path,
+          seen: seen,
+          game: game,
+          sent: 1,
+          since: nil,
+          no_game?: true,
+          bad: nil
+      }
+      |> facts(true)
+
+    emit(state, {:position, hd(game.plies).board})
+    state
+  end
+
+  # A game read for the first time since the board came (or since the file
+  # had none): its memory, then where it stands.
+  defp take(%{connected?: connected?, no_game?: no_game?} = state, path, game, seen)
+       when not connected? or no_game? do
+    if not connected?, do: emit(state, :connected)
+    state = %{state | no_game?: false}
     # Who is playing before what was played: Alnasl puts the board on its
     # pairing, and the memory is the game of that pairing.
     state =
@@ -228,6 +283,7 @@ defmodule Arkab.Driver.LiveChess do
       state
     else
       facts = LiveChess.facts(path, game)
+      facts = if state.no_game?, do: Map.put(facts, :no_game, true), else: facts
       if facts != state.facts or force?, do: emit(state, {:game, facts})
       %{state | facts: facts, facts_from: from}
     end

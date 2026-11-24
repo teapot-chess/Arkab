@@ -195,6 +195,49 @@ defmodule Arkab.Driver.LiveChessTest do
     assert next_event() == {:position, board_after(~w(d4))}
   end
 
+  test "an empty game file: the starting position and no_game, then the game as on first sight",
+       %{root: root, dir: dir} do
+    LiveChessFolder.round(dir, 1, [{1, LiveChessFolder.pgn([])}])
+    LiveChessFolder.write_game(dir, 1, 1, "")
+    start(root)
+
+    assert_receive {:driver, _id, :connected}, 2_000
+    assert_receive {:driver, _id, {:game, %{no_game: true, round: 1, game: 1} = facts}}, 2_000
+    assert %{white: %{name: _}} = facts
+    assert_receive {:driver, _id, {:position, board}}, 2_000
+    assert board == Board.start()
+
+    # LiveChess puts a game on the board, under way already.
+    LiveChessFolder.write_game(dir, 1, 1, LiveChessFolder.pgn(@four))
+    assert_receive {:driver, _id, {:game, facts}}, 2_000
+    refute Map.has_key?(facts, :no_game)
+    assert next_event() == {:history, history_of(@four)}
+    assert next_event() == {:position, board_after(~w(e4 e5 Nf3 Nc6))}
+    refute_receive {:driver, _id, :connected}, 100
+  end
+
+  test "a game file that empties for a moment is being rewritten: nothing sent", %{
+    root: root,
+    dir: dir
+  } do
+    LiveChessFolder.round(dir, 1, [{1, LiveChessFolder.pgn(@four)}])
+    start(root)
+    assert next_event() == :connected
+    assert {:history, _} = next_event()
+    assert {:position, _} = next_event()
+
+    LiveChessFolder.write_game(dir, 1, 1, "")
+    refute_position(300)
+
+    LiveChessFolder.write_game(dir, 1, 1, LiveChessFolder.pgn(@four ++ [{"Bb5", "1:27:00"}]))
+    assert next_event() == {:position, board_after(~w(e4 e5 Nf3 Nc6 Bb5))}
+  end
+
+  defp history_of(moves) do
+    {:ok, game} = Arkab.LiveChess.parse_game(LiveChessFolder.pgn(moves))
+    Arkab.LiveChess.history(game)
+  end
+
   test "the file gone is a board gone; back, it is met again", %{root: root, dir: dir} do
     path =
       LiveChessFolder.round(dir, 1, [{1, LiveChessFolder.pgn([])}]) |> Path.join("game-1.pgn")

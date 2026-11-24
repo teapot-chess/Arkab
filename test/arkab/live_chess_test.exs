@@ -124,6 +124,25 @@ defmodule Arkab.LiveChessTest do
       assert {:error, :partial} = LiveChess.parse_game("[Event \"x\"]\n\n1. e4 e")
     end
 
+    test "a file with no game in it yet is no game, not an empty board" do
+      assert {:error, :no_game} = LiveChess.parse_game("")
+      assert {:error, :no_game} = LiveChess.parse_game("\xEF\xBB\xBF\r\n  \r\n")
+
+      assert {:error, :no_game} =
+               LiveChess.parse_game("[Event \"x\"]\r\n[White \"Vermeulen, Wanda\"]\r\n")
+
+      # The e-board as it stands, nobody's pieces on it.
+      empty = ~s([Event "x"]\n[SetUp "1"]\n[FEN "8/8/8/8/8/8/8/8 w - - 0 1"]\n\n*\n)
+      assert {:error, :no_game} = LiveChess.parse_game(empty)
+
+      # Moves on a position that is none are still a broken game.
+      broken = ~s([SetUp "1"]\n[FEN "8/8/8/8/8/8/8/8 w - - 0 1"]\n\n1. e4 *\n)
+      assert {:error, {:illegal, 0, _why}} = LiveChess.parse_game(broken)
+
+      assert %{plies: [%{board: board}], result: "*", start: :standard} = LiveChess.no_game()
+      assert board == Board.start()
+    end
+
     test "the clock: who runs, and the running side's time counting down" do
       {:ok, game} = LiveChess.parse_game(LiveChessFolder.pgn(@game))
 

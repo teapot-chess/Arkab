@@ -85,7 +85,9 @@ source (`"livechess"`), the tournament's name, the source's round and game
 number, `white` and `black` (each with what is known of `name`, `fide_id`,
 `title`, `rating`, `federation`), the game file's `result`, and a `forfeit`
 (`"white"`, `"black"` or `"both"`: who forfeited) when the round's index
-says so. Keys with nothing known are left out. It is sent when the board is
+says so, and `"no_game": true` while the source has no game on the board
+yet (an empty LiveChess game file: the board shows the starting position
+meanwhile). Keys with nothing known are left out. It is sent when the board is
 met, again whenever it changes, and with `resend`. A DGT board never sends
 it. A server that does not know `game` drops it, as with `hist`.
 

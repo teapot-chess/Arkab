@@ -197,7 +197,7 @@ defmodule Arkab.Protocol do
 
   # Who is playing (`Arkab.LiveChess.facts/2`): only these names travel,
   # and only with something in them.
-  @game_keys ~w(source tournament round game result forfeit)a
+  @game_keys ~w(source tournament round game result forfeit no_game)a
   @game_names Map.new(@game_keys, &{to_string(&1), &1})
   @player_keys ~w(name fide_id title rating federation)a
   @player_names Map.new(@player_keys, &{to_string(&1), &1})
@@ -245,6 +245,7 @@ defmodule Arkab.Protocol do
 
   defp game_value?(key, v) when key in [:round, :game], do: is_integer(v) and v > 0
   defp game_value?(:forfeit, v), do: v in @forfeits
+  defp game_value?(:no_game, v), do: v == true
   defp game_value?(_key, v), do: is_binary(v)
 
   defp player_value?(key, v) when key in [:fide_id, :rating], do: is_integer(v) and v > 0

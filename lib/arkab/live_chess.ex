@@ -42,6 +42,11 @@ defmodule Arkab.LiveChess do
   as `[%clk]` had them after that move. A file read while LiveChess was
   writing it is `{:error, :partial}`, a game that cannot be played
   `{:error, {:illegal, ply, why}}`; neither ever becomes a position.
+
+  A file with no game in it yet is `{:error, :no_game}`: empty, tag pairs
+  and nothing after them, or no moves on a set-up position that is no
+  position (no kings: the e-board as it stands, before anybody set the
+  pieces up). LiveChess writes those for a board it has no game on yet.
   """
 
   alias Arkab.{Board, Chess, Pgn}
@@ -158,14 +163,47 @@ defmodule Arkab.LiveChess do
   Plays one game file's text. `{:ok, game}`: `plies` is every position,
   the first one before any move, each with the side to move and the
   clocks after it; `start` is `:standard` or the board the game was set
-  up on. `{:error, :partial | {:illegal, ply, why}}`. The file is read by
-  its driver (`Arkab.Driver.LiveChess`), which compares texts.
+  up on. `{:error, :partial | :no_game | {:illegal, ply, why}}` (see the
+  moduledoc). The file is read by its driver (`Arkab.Driver.LiveChess`),
+  which compares texts.
   """
   @spec parse_game(String.t()) :: {:ok, game()} | {:error, term()}
   def parse_game(text) do
-    with {:ok, pgn} <- Pgn.read(text),
-         fen = start_fen(pgn.headers),
-         {:ok, first} <- fen_position(fen),
+    case Pgn.read(text) do
+      {:ok, pgn} -> play_game(pgn)
+      {:error, :partial} -> if tags_only?(text), do: {:error, :no_game}, else: {:error, :partial}
+    end
+  end
+
+  @doc "A game that is no game yet: the starting position, nobody's moves."
+  @spec no_game() :: game()
+  def no_game do
+    {:ok, game} = parse_game(~s([Result "*"]\n\n*\n))
+    game
+  end
+
+  # Nothing but tag pairs (or nothing at all): no movetext, not even `*`.
+  # Half a file looks the same; the driver tells the two apart by whether
+  # it had a game from that file already.
+  defp tags_only?(text) do
+    text
+    |> String.replace(~r/\A\xEF\xBB\xBF/, "")
+    |> String.split("\n")
+    |> Enum.map(&String.trim/1)
+    |> Enum.all?(&(&1 == "" or String.starts_with?(&1, "[")))
+  end
+
+  defp play_game(%{moves: moves} = pgn) do
+    fen = start_fen(pgn.headers)
+
+    case fen_position(fen) do
+      {:error, _why} when moves == [] -> {:error, :no_game}
+      other -> play_game(pgn, fen, other)
+    end
+  end
+
+  defp play_game(pgn, fen, first) do
+    with {:ok, first} <- first,
          {:ok, positions} <- play(fen, pgn.moves) do
       {white0, black0} = initial_clocks(pgn.headers)
 

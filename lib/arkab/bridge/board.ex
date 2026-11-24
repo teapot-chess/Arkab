@@ -69,7 +69,7 @@ defmodule Arkab.Bridge.Board do
     end
   end
 
-  @doc "`%{id, port, address, connected?, info, position?}` for the status page and the server."
+  @doc "`%{id, port, address, connected?, info, position?, no_game?}` for the status page and the server."
   def status(pid), do: GenServer.call(pid, :status)
 
   # --- the process -------------------------------------------------------------
@@ -176,7 +176,9 @@ defmodule Arkab.Bridge.Board do
        address: state.address,
        connected?: state.connected?,
        info: state.info,
-       position?: state.position != nil
+       position?: state.position != nil,
+       # A LiveChess board whose file has no game yet.
+       no_game?: match?(%{no_game: true}, state.game)
      }, state}
   end
 

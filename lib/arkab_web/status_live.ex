@@ -591,6 +591,9 @@ defmodule ArkabWeb.StatusLive do
                 <span :if={board.info[:serial]} class="mono">
                   {Words.t(@locale, :serial)} {board.info[:serial]}
                 </span>
+                <span :if={board[:no_game?]} id={"board-no-game-#{board.id}"} class="note">
+                  {Words.t(@locale, :no_game)}
+                </span>
               </li>
             </ul>
           </li>

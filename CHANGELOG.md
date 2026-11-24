@@ -15,6 +15,11 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-11-24
+
+- [Fix] **A LiveChess board with no game yet shows the starting position, not an empty board.** An empty `game-M.pgn`, one with tag pairs and nothing after them, or one set up on an e-board nobody had put the pieces on yet was either never read ("half a file", for ever) or refused as an impossible position, and the board sat there in Alnasl with no pieces at all, which looks less like "waiting for a game" and more like a robbery. Such a board now comes up at the starting position, says `no_game` with whatever players the round's index already knows, and shows "no game in LiveChess yet" on the status page. When the game turns up it is sent as on first sight, memory and all. A file that held a game and reads empty for a moment is LiveChess rewriting it, and is left alone until it has finished.
+- [Feature] **A LiveChess board says who is playing.** Every game read from a LiveChess export folder now travels with its players (names, FIDE IDs, titles, ratings, federations, from the PGN's tags and the round's `index.json`), the LiveChess round and game number, the tournament's name, the result and any forfeit, as a new `game` event, sent when the board is met, whenever it changes, and on resend. Alnasl uses it to seat the board on its pairing; the bridge itself still has no idea who is winning and prefers it that way. DGT boards send nothing new.
+
 ## [0.7.2] - 2026-11-23
 
 - [Feature] **"Stop reading" beside a LiveChess folder on the status page.** Until now only Alnasl could let go of one, which is an odd place to keep the only off switch for something on this machine.

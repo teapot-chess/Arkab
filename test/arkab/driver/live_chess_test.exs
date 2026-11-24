@@ -42,6 +42,8 @@ defmodule Arkab.Driver.LiveChessTest do
     receive do
       {:driver, _id, {:poll, :ok}} -> next_event(timeout)
       {:driver, _id, {:clock, _}} -> next_event(timeout)
+      # Who is playing has tests of its own.
+      {:driver, _id, {:game, _}} -> next_event(timeout)
       {:driver, _id, event} -> event
     after
       timeout -> flunk("no event")
@@ -193,6 +195,49 @@ defmodule Arkab.Driver.LiveChessTest do
     assert next_event() == {:position, board_after(~w(d4))}
   end
 
+  test "an empty game file: the starting position and no_game, then the game as on first sight",
+       %{root: root, dir: dir} do
+    LiveChessFolder.round(dir, 1, [{1, LiveChessFolder.pgn([])}])
+    LiveChessFolder.write_game(dir, 1, 1, "")
+    start(root)
+
+    assert_receive {:driver, _id, :connected}, 2_000
+    assert_receive {:driver, _id, {:game, %{no_game: true, round: 1, game: 1} = facts}}, 2_000
+    assert %{white: %{name: _}} = facts
+    assert_receive {:driver, _id, {:position, board}}, 2_000
+    assert board == Board.start()
+
+    # LiveChess puts a game on the board, under way already.
+    LiveChessFolder.write_game(dir, 1, 1, LiveChessFolder.pgn(@four))
+    assert_receive {:driver, _id, {:game, facts}}, 2_000
+    refute Map.has_key?(facts, :no_game)
+    assert next_event() == {:history, history_of(@four)}
+    assert next_event() == {:position, board_after(~w(e4 e5 Nf3 Nc6))}
+    refute_receive {:driver, _id, :connected}, 100
+  end
+
+  test "a game file that empties for a moment is being rewritten: nothing sent", %{
+    root: root,
+    dir: dir
+  } do
+    LiveChessFolder.round(dir, 1, [{1, LiveChessFolder.pgn(@four)}])
+    start(root)
+    assert next_event() == :connected
+    assert {:history, _} = next_event()
+    assert {:position, _} = next_event()
+
+    LiveChessFolder.write_game(dir, 1, 1, "")
+    refute_position(300)
+
+    LiveChessFolder.write_game(dir, 1, 1, LiveChessFolder.pgn(@four ++ [{"Bb5", "1:27:00"}]))
+    assert next_event() == {:position, board_after(~w(e4 e5 Nf3 Nc6 Bb5))}
+  end
+
+  defp history_of(moves) do
+    {:ok, game} = Arkab.LiveChess.parse_game(LiveChessFolder.pgn(moves))
+    Arkab.LiveChess.history(game)
+  end
+
   test "the file gone is a board gone; back, it is met again", %{root: root, dir: dir} do
     path =
       LiveChessFolder.round(dir, 1, [{1, LiveChessFolder.pgn([])}]) |> Path.join("game-1.pgn")
@@ -217,5 +262,87 @@ defmodule Arkab.Driver.LiveChessTest do
 
     start("/nowhere", locate: fn -> path end)
     assert next_event() == :connected
+  end
+
+  # --- who is playing ----------------------------------------------------------------
+
+  defp next_game(timeout \\ 3_000) do
+    receive do
+      {:driver, _id, {:game, facts}} -> facts
+    after
+      timeout -> flunk("no game facts")
+    end
+  end
+
+  test "who is playing comes after connected and before the memory", %{root: root, dir: dir} do
+    LiveChessFolder.round(dir, 2, [
+      {1, LiveChessFolder.pgn(@four, "*", %{"WhiteFideId" => "9990001", "WhiteElo" => "2104"})}
+    ])
+
+    start(root)
+
+    assert_receive {:driver, _id, :connected}, 2_000
+    assert_receive {:driver, _id, event}, 2_000
+
+    assert {:game,
+            %{
+              source: "livechess",
+              tournament: "Open of Nowhere",
+              round: 2,
+              game: 1,
+              result: "*",
+              white: %{name: "Vermeulen, Wanda", fide_id: 9_990_001, rating: 2104},
+              black: %{name: "Brask, Otto"}
+            } = facts} = event
+
+    refute Map.has_key?(facts, :forfeit)
+    assert_receive {:driver, _id, {:history, _}}, 2_000
+  end
+
+  test "a forfeit written in the index is sent as new facts", %{root: root, dir: dir} do
+    round_dir = LiveChessFolder.round(dir, 1, [{1, LiveChessFolder.pgn([])}])
+    start(root)
+    assert %{result: "*"} = facts = next_game()
+    refute Map.has_key?(facts, :forfeit)
+
+    index = Path.join(round_dir, "index.json")
+    %{"pairings" => [pairing]} = index |> File.read!() |> Jason.decode!()
+
+    File.write!(
+      index,
+      Jason.encode!(%{"pairings" => [Map.put(pairing, "result", "WHITEFORFAIT")]})
+    )
+
+    LiveChessFolder.touch(index, 5)
+    assert %{forfeit: "white"} = next_game()
+  end
+
+  test "names the PGN leaves out come from the index" do
+    root = Path.join(System.tmp_dir!(), "arkab-lcf-#{System.unique_integer([:positive])}")
+    on_exit(fn -> File.rm_rf!(root) end)
+    dir = LiveChessFolder.new(root)
+    round_dir = LiveChessFolder.round(dir, 1, [])
+    path = Path.join(round_dir, "game-1.pgn")
+    File.write!(path, LiveChessFolder.pgn([], "*", %{"White" => "?", "Black" => ""}))
+
+    File.write!(
+      Path.join(round_dir, "index.json"),
+      Jason.encode!(%{
+        "pairings" => [
+          %{
+            "white" => %{"fname" => "Lotte", "lname" => "Ysebaert", "fideid" => 9_990_002},
+            "black" => %{"fname" => "Kasper", "lname" => nil, "title" => "FM"},
+            "result" => "*"
+          }
+        ]
+      })
+    )
+
+    {:ok, game} = Arkab.LiveChess.parse_game(File.read!(path))
+
+    assert %{
+             white: %{name: "Ysebaert, Lotte", fide_id: 9_990_002},
+             black: %{name: "Kasper", title: "FM"}
+           } = Arkab.LiveChess.facts(path, game)
   end
 end

@@ -22,8 +22,18 @@ defmodule Arkab.LiveChess do
 
   The round being played is the one whose game files were written last
   (`current/1`): not simply the highest, because the next round's games
-  may be written the moment it is paired, before anybody sits down. Only
-  the PGN files are read; `index.json` holds nothing a board needs.
+  may be written the moment it is paired, before anybody sits down. The
+  moves come from the PGN files only; `index.json` and `tournament.json`
+  add who is playing (`facts/2`).
+
+  ## Who is playing
+
+  `facts/2` is what the files say about a game besides its moves: the
+  players (name, FIDE ID, title, rating, federation) from the PGN's tags,
+  filled in from the round's `index.json` where a tag is missing, the
+  LiveChess round and game number, the tournament's name, the result,
+  and a forfeit when the index says one. The bridge sends it as
+  `{:game, facts}`; Alnasl puts the board on the pairing it belongs to.
 
   ## A game
 
@@ -32,6 +42,11 @@ defmodule Arkab.LiveChess do
   as `[%clk]` had them after that move. A file read while LiveChess was
   writing it is `{:error, :partial}`, a game that cannot be played
   `{:error, {:illegal, ply, why}}`; neither ever becomes a position.
+
+  A file with no game in it yet is `{:error, :no_game}`: empty, tag pairs
+  and nothing after them, or no moves on a set-up position that is no
+  position (no kings: the e-board as it stands, before anybody set the
+  pieces up). LiveChess writes those for a board it has no game on yet.
   """
 
   alias Arkab.{Board, Chess, Pgn}
@@ -42,7 +57,12 @@ defmodule Arkab.LiveChess do
           white_ms: integer() | nil,
           black_ms: integer() | nil
         }
-  @type game :: %{plies: [ply()], result: String.t(), start: :standard | Board.t()}
+  @type game :: %{
+          plies: [ply()],
+          result: String.t(),
+          start: :standard | Board.t(),
+          headers: %{String.t() => String.t()}
+        }
 
   # --- the folder ------------------------------------------------------------------
 
@@ -143,14 +163,47 @@ defmodule Arkab.LiveChess do
   Plays one game file's text. `{:ok, game}`: `plies` is every position,
   the first one before any move, each with the side to move and the
   clocks after it; `start` is `:standard` or the board the game was set
-  up on. `{:error, :partial | {:illegal, ply, why}}`. The file is read by
-  its driver (`Arkab.Driver.LiveChess`), which compares texts.
+  up on. `{:error, :partial | :no_game | {:illegal, ply, why}}` (see the
+  moduledoc). The file is read by its driver (`Arkab.Driver.LiveChess`),
+  which compares texts.
   """
   @spec parse_game(String.t()) :: {:ok, game()} | {:error, term()}
   def parse_game(text) do
-    with {:ok, pgn} <- Pgn.read(text),
-         fen = start_fen(pgn.headers),
-         {:ok, first} <- fen_position(fen),
+    case Pgn.read(text) do
+      {:ok, pgn} -> play_game(pgn)
+      {:error, :partial} -> if tags_only?(text), do: {:error, :no_game}, else: {:error, :partial}
+    end
+  end
+
+  @doc "A game that is no game yet: the starting position, nobody's moves."
+  @spec no_game() :: game()
+  def no_game do
+    {:ok, game} = parse_game(~s([Result "*"]\n\n*\n))
+    game
+  end
+
+  # Nothing but tag pairs (or nothing at all): no movetext, not even `*`.
+  # Half a file looks the same; the driver tells the two apart by whether
+  # it had a game from that file already.
+  defp tags_only?(text) do
+    text
+    |> String.replace(~r/\A\xEF\xBB\xBF/, "")
+    |> String.split("\n")
+    |> Enum.map(&String.trim/1)
+    |> Enum.all?(&(&1 == "" or String.starts_with?(&1, "[")))
+  end
+
+  defp play_game(%{moves: moves} = pgn) do
+    fen = start_fen(pgn.headers)
+
+    case fen_position(fen) do
+      {:error, _why} when moves == [] -> {:error, :no_game}
+      other -> play_game(pgn, fen, other)
+    end
+  end
+
+  defp play_game(pgn, fen, first) do
+    with {:ok, first} <- first,
          {:ok, positions} <- play(fen, pgn.moves) do
       {white0, black0} = initial_clocks(pgn.headers)
 
@@ -170,7 +223,7 @@ defmodule Arkab.LiveChess do
         end)
 
       start = if fen == Chess.start_fen(), do: :standard, else: first.board
-      {:ok, %{plies: plies, result: pgn.result, start: start}}
+      {:ok, %{plies: plies, result: pgn.result, start: start, headers: pgn.headers}}
     end
   end
 
@@ -296,4 +349,162 @@ defmodule Arkab.LiveChess do
   defp press(%{turn: :w}, %{white_ms: ms}) when is_integer(ms), do: [{:clock, :white, ms}]
   defp press(%{turn: :b}, %{black_ms: ms}) when is_integer(ms), do: [{:clock, :black, ms}]
   defp press(_before, _ply), do: []
+
+  # --- who is playing ----------------------------------------------------------------
+
+  @type player :: %{
+          optional(:name) => String.t(),
+          optional(:fide_id) => pos_integer(),
+          optional(:title) => String.t(),
+          optional(:rating) => pos_integer(),
+          optional(:federation) => String.t()
+        }
+
+  @doc """
+  What the files say about game `game` (as `parse_game/1` gave it) of
+  the file at `path`, besides its moves:
+
+      %{source: "livechess", tournament: "Open of Nowhere", round: 3, game: 5,
+        white: player, black: player, result: "*", forfeit: "white"}
+
+  A player has what is known of `:name`, `:fide_id`, `:title`, `:rating`
+  and `:federation`, the PGN's tags first (`White`, `WhiteFideId`,
+  `WhiteTitle`, `WhiteElo`), the round's `index.json` for what the tags
+  leave out; the index's name is "Last, First" as LiveChess keeps them.
+  `round` and `game` are the numbers of the folder and the file;
+  `tournament` the name in `tournament.json`; `result` the PGN's. A
+  `forfeit` (the side that forfeited, or `"both"`) only when the index
+  says so. Keys with nothing known are left out.
+  """
+  @spec facts(String.t(), game()) :: map()
+  def facts(path, game) do
+    round_dir = Path.dirname(path)
+    round = number(~r/^round-(\d+)$/, Path.basename(round_dir))
+    m = number(~r/^game-(\d+)\.pgn$/i, Path.basename(path))
+    pairing = pairing(round_dir, m)
+    headers = Map.get(game, :headers, %{})
+
+    %{
+      source: "livechess",
+      tournament: tournament_name(Path.dirname(round_dir)),
+      round: round,
+      game: m,
+      white: player(headers, "White", pairing["white"]),
+      black: player(headers, "Black", pairing["black"]),
+      result: game.result,
+      forfeit: forfeit(pairing["result"])
+    }
+    |> compact()
+  end
+
+  defp number(regex, name) do
+    case Regex.run(regex, name) do
+      [_, n] -> String.to_integer(n)
+      nil -> nil
+    end
+  end
+
+  # Game m of a round is pairing m of its index.
+  defp pairing(round_dir, m) when is_integer(m) do
+    with %{"pairings" => [_ | _] = pairings} <- json(Path.join(round_dir, "index.json")),
+         %{} = pairing <- Enum.at(pairings, m - 1) do
+      pairing
+    else
+      _none -> %{}
+    end
+  end
+
+  defp pairing(_round_dir, _m), do: %{}
+
+  defp tournament_name(dir) do
+    case json(Path.join(dir, "tournament.json")) do
+      %{"name" => name} -> text(name)
+      _none -> nil
+    end
+  end
+
+  # Small files only: a tournament's index is a few kilobytes.
+  defp json(path) do
+    with {:ok, %{size: size}} when size <= 1_000_000 <- File.stat(path),
+         {:ok, text} <- File.read(path),
+         {:ok, %{} = map} <- Jason.decode(text) do
+      map
+    else
+      _none -> nil
+    end
+  end
+
+  defp player(headers, side, listed) do
+    listed = if is_map(listed), do: listed, else: %{}
+
+    %{
+      name: name(headers[side]) || listed_name(listed),
+      fide_id: id(headers[side <> "FideId"]) || id(listed["fideid"]),
+      title: title(headers[side <> "Title"]) || title(listed["title"]),
+      rating: id(headers[side <> "Elo"]),
+      federation: title(listed["federation"])
+    }
+    |> compact()
+  end
+
+  # "?" and "NN" are PGN for nobody.
+  defp name(value) do
+    case text(value) do
+      name when name in [nil, "?", "NN", "-"] -> nil
+      name -> name
+    end
+  end
+
+  defp listed_name(listed) do
+    first = [listed["fname"], listed["mname"]] |> Enum.map(&text/1) |> Enum.reject(&is_nil/1)
+    last = text(listed["lname"])
+
+    case {last, Enum.join(first, " ")} do
+      {nil, ""} -> nil
+      {nil, first} -> first
+      {last, ""} -> last
+      {last, first} -> last <> ", " <> first
+    end
+  end
+
+  defp title(value) do
+    case text(value) do
+      title when title in [nil, "-", "?"] -> nil
+      title -> title
+    end
+  end
+
+  defp id(n) when is_integer(n) and n > 0, do: n
+
+  defp id(text) when is_binary(text) do
+    case Integer.parse(String.trim(text)) do
+      {n, ""} when n > 0 -> n
+      _other -> nil
+    end
+  end
+
+  defp id(_other), do: nil
+
+  defp text(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      text -> text
+    end
+  end
+
+  defp text(_other), do: nil
+
+  # LiveChess writes a forfeit in the index, not in the PGN.
+  defp forfeit(result) when is_binary(result) do
+    case String.upcase(result) do
+      "WHITEFORFAIT" -> "white"
+      "BLACKFORFAIT" -> "black"
+      "DOUBLEFORFAIT" -> "both"
+      _other -> nil
+    end
+  end
+
+  defp forfeit(_other), do: nil
+
+  defp compact(map), do: for({k, v} <- map, v != nil and v != %{}, into: %{}, do: {k, v})
 end

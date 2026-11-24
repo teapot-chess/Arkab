@@ -69,7 +69,7 @@ defmodule Arkab.Bridge.Board do
     end
   end
 
-  @doc "`%{id, port, address, connected?, info, position?}` for the status page and the server."
+  @doc "`%{id, port, address, connected?, info, position?, no_game?}` for the status page and the server."
   def status(pid), do: GenServer.call(pid, :status)
 
   # --- the process -------------------------------------------------------------
@@ -97,6 +97,9 @@ defmodule Arkab.Bridge.Board do
       # rest. A DGT board's memory is read when it is met, not on request.
       resend_history?: Keyword.get(opts, :resend_history, false),
       history: nil,
+      # Who is playing, from a driver that knows (`{:game, facts}`): sent
+      # again with the rest.
+      game: nil,
       # The last {t, speed, next} of a played board: what "now" is for it.
       played: nil,
       poll: nil,
@@ -156,6 +159,7 @@ defmodule Arkab.Bridge.Board do
     events =
       [if(state.connected?, do: :connected, else: :disconnected)] ++
         if(state.info == %{}, do: [], else: [{:info, state.info}]) ++
+        if(state.game, do: [{:game, state.game}], else: []) ++
         if(state.history, do: [{:history, state.history}], else: []) ++
         if(state.position, do: [{:position, state.position}], else: []) ++
         if(state.clock, do: [{:clock, state.clock}], else: [])
@@ -172,7 +176,9 @@ defmodule Arkab.Bridge.Board do
        address: state.address,
        connected?: state.connected?,
        info: state.info,
-       position?: state.position != nil
+       position?: state.position != nil,
+       # A LiveChess board whose file has no game yet.
+       no_game?: match?(%{no_game: true}, state.game)
      }, state}
   end
 
@@ -231,6 +237,7 @@ defmodule Arkab.Bridge.Board do
   defp remember(%{resend_history?: true} = state, {:history, events}),
     do: %{state | history: events}
 
+  defp remember(state, {:game, facts}), do: %{state | game: facts}
   defp remember(state, {:clock, reading}), do: %{state | clock: reading}
   defp remember(state, :connected), do: notify(%{state | connected?: true})
   defp remember(state, :disconnected), do: notify(%{state | connected?: false})

@@ -92,11 +92,12 @@ defmodule Arkab.Bridge.Board do
       info: %{},
       position: nil,
       clock: nil,
-      # The board's memory as last read, kept only for a driver whose memory
-      # is its whole game (`Arkab.Driver.LiveChess`) and sent again with the
-      # rest. A DGT board's memory is read when it is met, not on request.
+      # A driver whose memory is its whole game (`Arkab.Driver.LiveChess`):
+      # the memory is asked of it again (`history/1`) and sent with the rest.
+      # Not the one it sent first: by the next round that is another pair's
+      # game, and Alnasl would add its moves to this one. A DGT board's
+      # memory is read when it is met, not on request.
       resend_history?: Keyword.get(opts, :resend_history, false),
-      history: nil,
       # Who is playing, from a driver that knows (`{:game, facts}`): sent
       # again with the rest.
       game: nil,
@@ -156,11 +157,13 @@ defmodule Arkab.Bridge.Board do
         nil -> {System.os_time(:millisecond), nil}
       end
 
+    history = history(state)
+
     events =
       [if(state.connected?, do: :connected, else: :disconnected)] ++
         if(state.info == %{}, do: [], else: [{:info, state.info}]) ++
         if(state.game, do: [{:game, state.game}], else: []) ++
-        if(state.history, do: [{:history, state.history}], else: []) ++
+        if(history, do: [{:history, history}], else: []) ++
         if(state.position, do: [{:position, state.position}], else: []) ++
         if(state.clock, do: [{:clock, state.clock}], else: [])
 
@@ -232,10 +235,13 @@ defmodule Arkab.Bridge.Board do
   defp answered(1), do: {:poll, :ok}
   defp answered(n), do: {:poll, :ok, n}
 
-  defp remember(state, {:position, board}), do: %{state | position: board}
+  defp history(%{resend_history?: true, pid: pid, driver: driver}) when is_pid(pid) do
+    if function_exported?(driver, :history, 1), do: driver.history(pid)
+  end
 
-  defp remember(%{resend_history?: true} = state, {:history, events}),
-    do: %{state | history: events}
+  defp history(_state), do: nil
+
+  defp remember(state, {:position, board}), do: %{state | position: board}
 
   defp remember(state, {:game, facts}), do: %{state | game: facts}
   defp remember(state, {:clock, reading}), do: %{state | clock: reading}

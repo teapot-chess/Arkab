@@ -190,6 +190,57 @@ defmodule Arkab.BridgeLiveChessTest do
     assert "pos" in kinds and "clk" in kinds
   end
 
+  test "the memory sent again is the game on the board now, not the one it had at first sight",
+       %{tournament: t} do
+    first = LiveChessFolder.round(t, 1, [{1, @game}]) |> Path.join("game-1.pgn")
+    later = LiveChessFolder.pgn([{"d4", "1:29:50"}, {"d5", "1:29:40"}, {"c4", "1:29:30"}])
+    next = LiveChessFolder.round(t, 2, [{1, later}]) |> Path.join("game-1.pgn")
+    {:ok, where} = Agent.start_link(fn -> first end)
+
+    start_supervised!({Registry, keys: :unique, name: Arkab.Bridge.BoardRegistry})
+
+    board =
+      start_supervised!(
+        {Board,
+         id: "LiveChess#1",
+         port: "LiveChess",
+         address: 1,
+         driver: Arkab.Driver.LiveChess,
+         resend_history: true,
+         store: self(),
+         ports: self(),
+         driver_opts: [
+           options: %{"step_ms" => 10},
+           locate: fn -> Agent.get(where, & &1) end,
+           tick_ms: 50
+         ]}
+      )
+
+    assert_receive {:"$gen_cast", {:append, {"LiveChess#1", _t, nil, %{"k" => "hist"}}}}, 3_000
+
+    # The next round: the same board, another pair, another game.
+    Agent.update(where, fn _ -> next end)
+    {:ok, game} = Arkab.LiveChess.parse_game(later)
+    last = List.last(game.plies).board
+    eventually(fn -> receive_position(last) end)
+    flush()
+
+    assert :ok = GenServer.call(board, :resend)
+    expected = Arkab.Protocol.event_fields({:history, Arkab.LiveChess.history(game)})
+    assert_receive {:"$gen_cast", {:append, {"LiveChess#1", _t, nil, %{"k" => "hist"} = hist}}}
+    assert hist == expected
+  end
+
+  defp receive_position(board) do
+    expected = Arkab.Protocol.event_fields({:position, board})
+
+    receive do
+      {:"$gen_cast", {:append, {_id, _t, _at, ^expected}}} -> true
+    after
+      20 -> false
+    end
+  end
+
   defp flush do
     receive do
       _any -> flush()

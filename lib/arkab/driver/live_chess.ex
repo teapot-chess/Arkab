@@ -40,6 +40,8 @@ defmodule Arkab.Driver.LiveChess do
   - `{:game, facts}` again whenever the facts change: a forfeit or a name
     put right in the round's `index.json`, a result, the next round.
   - The file gone (or the round has no such board): `:disconnected`.
+  - Asked (`history/1`, when the board is sent again whole): the memory
+    of the game on the board now, up to the last position sent.
   - A file with no game in it yet (`{:error, :no_game}`: empty, tags only,
     an empty e-board): `:connected`, who is playing as far as the round's
     index knows, with `no_game: true`, and the starting position - not an
@@ -126,6 +128,27 @@ defmodule Arkab.Driver.LiveChess do
 
   def handle_info(:step, state), do: {:noreply, step(%{state | stepping?: false})}
   def handle_info(_other, state), do: {:noreply, state}
+
+  @doc """
+  The board's memory as it stands now: the game on the board, up to the
+  last position sent (`Arkab.LiveChess.history/1`), or `nil` while there
+  is none. What `Arkab.Bridge.Board` sends again with the rest of the
+  board - not the memory sent at first sight, which by the next round is
+  another pair's game.
+  """
+  def history(driver) do
+    GenServer.call(driver, :history, 2_000)
+  catch
+    :exit, _reason -> nil
+  end
+
+  @impl true
+  def handle_call(:history, _from, %{connected?: true, game: %{plies: [_ | _]} = game} = state) do
+    shown = %{game | plies: Enum.take(game.plies, max(state.sent, 1))}
+    {:reply, LiveChess.history(shown), state}
+  end
+
+  def handle_call(:history, _from, state), do: {:reply, nil, state}
 
   # --- reading the file ----------------------------------------------------------
 

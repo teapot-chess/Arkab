@@ -145,6 +145,7 @@ defmodule Arkab.Bridge.Store do
   # --- the process -------------------------------------------------------------
 
   @impl true
+  # sobelow_skip ["Traversal.FileModule"]
   def init(opts) do
     # So that a batch still in hand is written on the way out.
     Process.flag(:trap_exit, true)

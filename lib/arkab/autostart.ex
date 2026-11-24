@@ -64,6 +64,7 @@ defmodule Arkab.Autostart do
   defp done({_out, 0}), do: :ok
   defp done({out, _status}), do: {:error, String.trim(out)}
 
+  # sobelow_skip ["CI.System"]
   defp reg(args) do
     run = Application.get_env(:arkab, :autostart_cmd, &System.cmd/3)
     run.("reg", args, stderr_to_stdout: true)

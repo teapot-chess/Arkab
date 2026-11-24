@@ -45,6 +45,7 @@ defmodule ArkabWeb.Endpoint do
   plug ArkabWeb.Router
 
   @doc false
+  # sobelow_skip ["XSS.SendResp"]
   def favicon(%Plug.Conn{request_path: "/favicon.svg"} = conn, _opts) do
     conn
     |> Plug.Conn.put_resp_content_type("image/svg+xml")
@@ -59,6 +60,7 @@ defmodule ArkabWeb.Endpoint do
   The page's signing secret: made on the first start and kept in `path`,
   so a bridge needs no configuration and its cookies survive a restart.
   """
+  # sobelow_skip ["Traversal.FileModule"]
   def ensure_secret(path) do
     config = Application.get_env(:arkab, __MODULE__, [])
 

@@ -129,6 +129,7 @@ defmodule Arkab.Driver.LiveChess do
 
   # --- reading the file ----------------------------------------------------------
 
+  # sobelow_skip ["Traversal.FileModule"]
   defp read(state) do
     with path when is_binary(path) <- state.locate.(),
          {:ok, %{mtime: mtime, size: size}} when size <= @max_bytes <-

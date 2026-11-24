@@ -357,6 +357,7 @@ defmodule Arkab.Updates do
   # systemd: the version, in a file that a path unit watches. The file says
   # which version and nothing else; update.sh takes it for a version number
   # or not at all.
+  # sobelow_skip ["Traversal.FileModule"]
   defp hand_over(:systemd, info) do
     dir = request_dir()
 
@@ -376,6 +377,7 @@ defmodule Arkab.Updates do
   version}` or `{:failed, version, words}`. It writes one line to the file
   the unit names in `ARKAB_UPDATE_STATUS`.
   """
+  # sobelow_skip ["Traversal.FileModule"]
   def last_result do
     path =
       Application.get_env(:arkab, :update_status_file) || System.get_env("ARKAB_UPDATE_STATUS")

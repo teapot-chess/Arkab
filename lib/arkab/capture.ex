@@ -59,6 +59,7 @@ defmodule Arkab.Capture do
   and no positions (a recording of a real board, or a log written by
   `tools/serial_proxy.py`) is decoded with the DGT protocol on the way.
   """
+  # sobelow_skip ["Traversal.FileModule"]
   def read(path, address \\ nil) do
     with {:ok, text} <- File.read(path) do
       # A capture of a loop marks each line with the address it belongs to

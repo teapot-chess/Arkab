@@ -285,9 +285,6 @@ defmodule Arkab.Dgt.Emulator do
     %{emu | journal: emu.journal <> written, memory: emu.memory <> written, sent: <<>>}
   end
 
-  @doc "Writes `bytes` into the board's memory as they are: wrapped, garbled, made up."
-  def write_memory(%__MODULE__{} = emu, bytes), do: %{emu | memory: emu.memory <> bytes}
-
   @doc "The same for one board of a loop."
   def set_board(emulators, address, board) when is_list(emulators),
     do: on(emulators, address, &set_board(&1, board))

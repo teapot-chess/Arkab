@@ -15,6 +15,10 @@ tagged so that a version can be skimmed:
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-11-25
+
+- [Removed] **The emulator's `write_memory/2`.** A way to scribble made-up bytes into a fake board's memory, kept for a test that was never written. Nothing called it, in this repo or in Alnasl, so it goes. The real boards are unaffected, and so is every protocol timing.
+
 ## [0.7.5] - 2026-11-24
 - [Security] **db_connection 2.10.3.** A fresh advisory (EEF-CVE-2026-133555) against 2.10.2; the dependency audit noticed before anyone else had to.
 
